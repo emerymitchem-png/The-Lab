@@ -1,0 +1,152 @@
+{
+  "asset_requirements": {
+    "version": "MVP - 8-bit Pixel Art",
+    "total_assets_needed": 150,
+    "priority": "Game Loop First → Graphics Polish Later"
+  },
+
+  "sprite_sheets": {
+    "player_spritesheet": {
+      "filename": "player.png",
+      "size": "32x32 per frame",
+      "frames_needed": {
+        "idle": 1,
+        "moving_up": 1,
+        "moving_down": 1,
+        "moving_left": 1,
+        "moving_right": 1,
+        "death": 4
+      },
+      "total_frames": 9,
+      "style": "8-bit, green tinted, Science Quest 2 style",
+      "priority": "Medium (can use placeholder)"
+    }
+  },
+
+  "enemy_spritesheets": {
+    "floor_1_lab": {
+      "enemies": [
+        {
+          "id": "runaway_beaker",
+          "filename": "enemy_beaker.png",
+          "size": "32x32",
+          "frames": 4,
+          "animation": "rolling",
+          "colors": ["cyan", "glowing"]
+        },
+        {
+          "id": "centrifuge",
+          "filename": "enemy_centrifuge.png",
+          "size": "32x32",
+          "frames": 6,
+          "animation": "spinning",
+          "colors": ["magenta", "glowing"]
+        },
+        {
+          "id": "bunsen_burner",
+          "filename": "enemy_bunsen.png",
+          "size": "32x32",
+          "frames": 4,
+          "animation": "flame_loop",
+          "colors": ["orange", "red"]
+        },
+        {
+          "id": "petri_dish_bloom",
+          "filename": "enemy_bloom.png",
+          "size": "32x32",
+          "frames": 6,
+          "animation": "pulsing",
+          "colors": ["pink", "bioluminescent"]
+        },
+        {
+          "id": "rolling_stool",
+          "filename": "enemy_stool.png",
+          "size": "32x32",
+          "frames": 4,
+          "animation": "rolling",
+          "colors": ["yellow", "neutral"]
+        },
+        {
+          "id": "spinning_ruler",
+          "filename": "enemy_ruler.png",
+          "size": "32x32",
+          "frames": 8,
+          "animation": "spinning",
+          "colors": ["blue", "neutral"]
+        }
+      ],
+      "total_frames": 32
+    },
+
+    "floor_2_geosphere": {
+      "enemies": [
+        {"id": "crystal_shard_colony", "filename": "enemy_crystal.png", "size": "64x64", "frames": 2},
+        {"id": "pressure_stone", "filename": "enemy_stone.png", "size": "64x64", "frames": 2},
+        {"id": "thermal_vent_chimney", "filename": "enemy_vent.png", "size": "48x48", "frames": 6},
+        {"id": "fault_line_fissure", "filename": "enemy_fault.png", "size": "32x32", "frames": 4},
+        {"id": "tremor_beetle", "filename": "enemy_beetle.png", "size": "40x40", "frames": 4},
+        {"id": "mineral_spike", "filename": "enemy_spike.png", "size": "32x32", "frames": 3}
+      ],
+      "total_frames": 21
+    },
+
+    "floor_3_hydrosphere": {
+      "enemies": [
+        {"id": "primordial_blob", "filename": "enemy_blob.png", "size": "32x32", "frames": 4},
+        {"id": "thermal_vent", "filename": "enemy_thermal_vent.png", "size": "32x32", "frames": 4},
+        {"id": "chemical_reaction", "filename": "enemy_chemical.png", "size": "48x48", "frames": 4},
+        {"id": "proto_swimmer", "filename": "enemy_swimmer.png", "size": "32x32", "frames": 6},
+        {"id": "pressure_squid", "filename": "enemy_squid.png", "size": "40x40", "frames": 4},
+        {"id": "coral_formation", "filename": "enemy_coral.png", "size": "32x32", "frames": 2}
+      ],
+      "total_frames": 24
+    },
+
+    "floor_4_atmosphere": {
+      "enemies": [
+        {"id": "storm_vortex", "filename": "enemy_vortex.png", "size": "48x48", "frames": 8},
+        {"id": "lightning_strike", "filename": "enemy_lightning.png", "size": "32x32", "frames": 4},
+        {"id": "solar_flare", "filename": "enemy_flare.png", "size": "48x48", "frames": 6},
+        {"id": "pressure_wave", "filename": "enemy_wave.png", "size": "64x32", "frames": 4},
+        {"id": "radiation_cell", "filename": "enemy_radiation.png", "size": "32x32", "frames": 4},
+        {"id": "frost_shard", "filename": "enemy_frost.png", "size": "32x32", "frames": 3}
+      ],
+      "total_frames": 29
+    },
+
+    "floor_5_biosphere": {
+      "enemies": [
+        {"id": "predator", "filename": "enemy_predator.png", "size": "40x40", "frames": 6},
+        {"id": "symbiote", "filename": "enemy_symbiote.png", "size": "32x32", "frames": 4},
+        {"id": "consciousness_node", "filename": "enemy_node.png", "size": "48x48", "frames": 4},
+        {"id": "apex", "filename": "enemy_apex.png", "size": "56x56", "frames": 8},
+        {"id": "reality_rift", "filename": "enemy_rift.png", "size": "40x40", "frames": 6},
+        {"id": "void_entity", "filename": "enemy_void.png", "size": "48x48", "frames": 6}
+      ],
+      "total_frames": 34
+    }
+  },
+
+  "boss_spritesheets": {
+    "entropy": {"filename": "boss_entropy.png", "size": "64x64", "frames": 8},
+    "tectonic_titan": {"filename": "boss_tectonic.png", "size": "128x128", "frames": 6},
+    "the_nucleus": {"filename": "boss_nucleus.png", "size": "96x96", "frames": 8},
+    "stellar_furnace": {"filename": "boss_furnace.png", "size": "128x128", "frames": 8},
+    "the_infinitum": {"filename": "boss_infinitum.png", "size": "144x144", "frames": 12}
+  },
+
+  "production_timeline": {
+    "phase_1_gameplay": "Weeks 1-2 (placeholder graphics okay)",
+    "phase_2_content": "Weeks 3-4 (load from JSON, use placeholders)",
+    "phase_3_graphics_start": "Week 5 (start creating sprite sheets)",
+    "phase_4_graphics_finish": "Weeks 6-8 (create all 150+ assets)",
+    "phase_5_polish": "Weeks 9-10 (final balance, juice)",
+    "launch": "Week 11"
+  },
+
+  "notes": {
+    "priority": "Get gameplay right first. Graphics can be updated anytime without touching code.",
+    "hosting": "GitHub Pages auto-deploys on every push to main",
+    "live_link": "https://emerymitchem-png.github.io/The-Lab/"
+  }
+}

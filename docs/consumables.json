@@ -1,0 +1,286 @@
+{
+  "consumables_system": {
+    "description": "Limited-use tools. Limited charges per item. Used to access areas or solve puzzles.",
+    "starting_inventory": {
+      "match": {
+        "quantity": 1,
+        "max_charges": 10
+      },
+      "rope": {
+        "quantity": 1,
+        "max_charges": 10
+      },
+      "blowtorch": {
+        "quantity": 0,
+        "max_charges": 10
+      },
+      "breaker_bar": {
+        "quantity": 0,
+        "max_charges": 8
+      }
+    },
+
+    "consumable_list": [
+      {
+        "id": "match",
+        "name": "Match",
+        "icon": "🔥",
+        "description": "Ignite fire to burn obstacles",
+        "mechanic": "Use to burn fire barriers, ignite combustibles",
+        "use_cases": [
+          "Burn wooden barriers",
+          "Light torches",
+          "Ignite fuel containers"
+        ],
+        "charges_per_find": "1-3",
+        "max_stack": 10,
+        "drop_rate": {
+          "normal_room": 0.08,
+          "rare_room": 0.15,
+          "secret_room": 0.20,
+          "shop_price": 40
+        },
+        "biome_usage": {
+          "floor_1_lab": 0.5,
+          "floor_2_geosphere": 0.3,
+          "floor_3_hydrosphere": 0.2,
+          "floor_4_atmosphere": 0.4,
+          "floor_5_biosphere": 0.3
+        }
+      },
+      {
+        "id": "rope",
+        "name": "Rope",
+        "icon": "🪢",
+        "description": "Cross gaps and chasms",
+        "mechanic": "Use to swing/climb across gaps, reach higher areas",
+        "use_cases": [
+          "Cross bottomless pits",
+          "Swing to unreachable platforms",
+          "Climb vertical obstacles"
+        ],
+        "charges_per_find": "1-3",
+        "max_stack": 10,
+        "drop_rate": {
+          "normal_room": 0.07,
+          "rare_room": 0.15,
+          "secret_room": 0.25,
+          "shop_price": 45
+        },
+        "biome_usage": {
+          "floor_1_lab": 0.4,
+          "floor_2_geosphere": 0.5,
+          "floor_3_hydrosphere": 0.6,
+          "floor_4_atmosphere": 0.3,
+          "floor_5_biosphere": 0.4
+        }
+      },
+      {
+        "id": "blowtorch",
+        "name": "Blowtorch",
+        "icon": "🔥",
+        "description": "Melt ice and cut through materials",
+        "mechanic": "Use to melt ice barriers, cut/burn through sealed structures",
+        "use_cases": [
+          "Melt ice barriers",
+          "Burn through sealed doors",
+          "Heat puzzle mechanisms"
+        ],
+        "charges_per_find": "1-3",
+        "max_stack": 10,
+        "drop_rate": {
+          "normal_room": 0.04,
+          "rare_room": 0.20,
+          "secret_room": 0.30,
+          "shop_price": 60
+        },
+        "biome_usage": {
+          "floor_1_lab": 0.1,
+          "floor_2_geosphere": 0.2,
+          "floor_3_hydrosphere": 0.7,
+          "floor_4_atmosphere": 0.2,
+          "floor_5_biosphere": 0.4
+        }
+      },
+      {
+        "id": "breaker_bar",
+        "name": "Breaker Bar",
+        "icon": "⚒️",
+        "description": "Break through rock and barriers",
+        "mechanic": "Use to smash rock barriers, break sealed containers",
+        "use_cases": [
+          "Smash rock walls",
+          "Break through mineral barriers",
+          "Crack open sealed chests/boxes"
+        ],
+        "charges_per_find": "1-2",
+        "max_stack": 8,
+        "drop_rate": {
+          "normal_room": 0.02,
+          "rare_room": 0.12,
+          "secret_room": 0.20,
+          "shop_price": 55
+        },
+        "biome_usage": {
+          "floor_1_lab": 0.2,
+          "floor_2_geosphere": 0.8,
+          "floor_3_hydrosphere": 0.1,
+          "floor_4_atmosphere": 0.3,
+          "floor_5_biosphere": 0.5
+        }
+      }
+    ],
+
+    "drop_rates_by_room": {
+      "normal_room": {
+        "total_drop_chance": 0.20,
+        "breakdown": {
+          "match": 0.08,
+          "rope": 0.07,
+          "blowtorch": 0.04,
+          "breaker_bar": 0.01
+        }
+      },
+      "rare_room": {
+        "total_drop_chance": 0.50,
+        "breakdown": {
+          "match": 0.10,
+          "rope": 0.15,
+          "blowtorch": 0.15,
+          "breaker_bar": 0.10
+        }
+      },
+      "secret_room": {
+        "total_drop_chance": 0.90,
+        "breakdown": {
+          "match": 0.15,
+          "rope": 0.25,
+          "blowtorch": 0.30,
+          "breaker_bar": 0.20
+        }
+      },
+      "hidden_chest": {
+        "total_drop_chance": 1.0,
+        "breakdown": {
+          "match": 0.10,
+          "rope": 0.35,
+          "blowtorch": 0.40,
+          "breaker_bar": 0.15
+        }
+      }
+    },
+
+    "shop_consumables_by_floor": {
+      "floor_1": {
+        "match": {
+          "charges": 3,
+          "price": 40
+        },
+        "rope": {
+          "charges": 3,
+          "price": 45
+        }
+      },
+      "floor_2": {
+        "match": {
+          "charges": 3,
+          "price": 40
+        },
+        "rope": {
+          "charges": 3,
+          "price": 45
+        },
+        "blowtorch": {
+          "charges": 3,
+          "price": 60
+        }
+      },
+      "floor_3": {
+        "match": {
+          "charges": 3,
+          "price": 45
+        },
+        "rope": {
+          "charges": 3,
+          "price": 50
+        },
+        "blowtorch": {
+          "charges": 3,
+          "price": 65
+        },
+        "breaker_bar": {
+          "charges": 2,
+          "price": 55
+        }
+      },
+      "floor_4": {
+        "match": {
+          "charges": 4,
+          "price": 50
+        },
+        "rope": {
+          "charges": 4,
+          "price": 55
+        },
+        "blowtorch": {
+          "charges": 4,
+          "price": 70
+        },
+        "breaker_bar": {
+          "charges": 3,
+          "price": 60
+        }
+      },
+      "floor_5": {
+        "match": {
+          "charges": 5,
+          "price": 60
+        },
+        "rope": {
+          "charges": 5,
+          "price": 65
+        },
+        "blowtorch": {
+          "charges": 5,
+          "price": 80
+        },
+        "breaker_bar": {
+          "charges": 4,
+          "price": 70
+        }
+      }
+    },
+
+    "inventory_mechanics": {
+      "consumable_slots": 4,
+      "slot_equipment": [
+        {
+          "slot": 1,
+          "item_type": "match",
+          "max_charges": 10
+        },
+        {
+          "slot": 2,
+          "item_type": "rope",
+          "max_charges": 10
+        },
+        {
+          "slot": 3,
+          "item_type": "blowtorch",
+          "max_charges": 10
+        },
+        {
+          "slot": 4,
+          "item_type": "breaker_bar",
+          "max_charges": 8
+        }
+      ],
+      "mechanics": {
+        "on_use": "Deduct 1 charge from item",
+        "at_zero_charges": "Item grayed out, can't use",
+        "refind_item": "Add charges back to that slot",
+        "permanent_tool_override": "If permanent tool found, replaces consumable slot with limited uses (50-999 depending on tool)"
+      }
+    }
+  }
+}

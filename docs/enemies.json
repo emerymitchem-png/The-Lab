@@ -1,0 +1,1032 @@
+{
+  "enemy_system": {
+    "philosophy": "Enemy evolution mirrors floor progression. Simple → Complex → Intelligent. Each floor has unique enemy archetypes + 1 boss.",
+    "combat_style": "Twin-stick roguelike. Kiting, positioning, pattern learning. Emergent interactions between enemies and hazards.",
+    
+    "floor_1_lab": {
+      "floor": 1,
+      "biome": "The Infinite Lab",
+      "era": "Modern Day",
+      "theme": "Equipment gone wrong. Simple mechanics. Playful but grimdark.",
+      "visual_palette": "Whites, grays, blacks with neon pink/blue accents. Clean geometric rooms, metal surfaces, glass, plastic.",
+      "feel": "Playful, scientific, no real threat. Learning space.",
+      
+      "enemies": [
+        {
+          "id": "runaway_beaker",
+          "name": "Runaway Beaker",
+          "icon": "🧪",
+          "description": "Lab equipment rolling out of control",
+          "type": "Rolling Hazard",
+          "behavior": "Rolls toward you, accelerates each turn",
+          "attack": {
+            "contact_damage": "5 dmg (slow) → 12 dmg (fast) → 18 dmg (very fast)",
+            "knockback": false,
+            "effect": "Leaves puddles of liquid as it rolls (slow you down)"
+          },
+          "health": 25,
+          "spawn_rate": "Common",
+          "strategy": "Bait into walls, attack during recovery. Use puddles tactically.",
+          "twist": "Can hit other enemies (use as weapon). Puddles slow YOU too (risk/reward)."
+        },
+        {
+          "id": "centrifuge",
+          "name": "Centrifuge",
+          "icon": "⚙️",
+          "description": "Laboratory centrifuge spinning rapidly",
+          "type": "Stationary Spray",
+          "behavior": "Stationary, spins in place constantly",
+          "attack": {
+            "pattern": "5 projectiles in rotating circular spray every 1.5 sec",
+            "projectiles_per_attack": 5,
+            "damage_per_projectile": 3,
+            "mechanic": "Gaps between spray lines you can squeeze through"
+          },
+          "health": 35,
+          "spawn_rate": "Common",
+          "strategy": "Predict spray gaps, position diagonally. Spray speed increases over time.",
+          "twist": "Projectiles bounce off obstacles. Multiple centrifuges can sync (chaos)."
+        },
+        {
+          "id": "bunsen_burner",
+          "name": "Bunsen Burner",
+          "icon": "🔥",
+          "description": "Lab burner with uncontrolled flame",
+          "type": "Stationary Flame",
+          "behavior": "Stationary, rotates to face you",
+          "attack": {
+            "pattern": "Wide flame cone (120 degree arc) every 1.2 sec",
+            "coverage": "Large area, slow movement",
+            "damage_per_tick": 4,
+            "mechanic": "Flame lingers briefly, creating temporary hazard zones"
+          },
+          "health": 30,
+          "spawn_rate": "Common",
+          "strategy": "Move perpendicular to flame (strafe). Attack from sides.",
+          "twist": "Flame ignites other enemies. Room temperature rises (activates other hazards)."
+        },
+        {
+          "id": "petri_dish_bloom",
+          "name": "Petri Dish Bloom",
+          "icon": "🧫",
+          "description": "Fractal bacterial colony - splits when hit",
+          "type": "Fractal Enemy (Signature)",
+          "tier_1_original": {
+            "size": "Medium (15% screen)",
+            "health": 40,
+            "behavior": "Drifts slowly toward you",
+            "attack": "Shoots 3 small bloom spores every 1 sec",
+            "spore_damage": 2,
+            "spore_duration": "4 sec before dissipate"
+          },
+          "tier_2_medium": {
+            "spawn_count": 2,
+            "health_per": 20,
+            "behavior": "Moves at same speed as original",
+            "attack": "Shoots 2 spores every 1.5 sec",
+            "spore_size": "Larger than tier 1"
+          },
+          "tier_3_small": {
+            "spawn_count": 4,
+            "health_per": 10,
+            "behavior": "Slower movement",
+            "attack": "Shoots 1 spore every 2 sec",
+            "spore_size": "Tiny"
+          },
+          "strategy": {
+            "aggressive": "Kill original quickly before splits (7 sec window)",
+            "methodical": "Let splits happen, manage multi-tier threats",
+            "ranged": "Pick off spores as they come (safest, slowest)"
+          },
+          "spawn_rate": "Uncommon",
+          "difficulty": "Medium-Hard (most complex Floor 1 enemy)",
+          "twist": "Spores can fertilize other blooms (cause faster splits). Fragments can merge if you're careless."
+        },
+        {
+          "id": "rolling_stool",
+          "name": "Rolling Stool",
+          "icon": "🪑",
+          "description": "Lab stool on wheels, erratically bouncing",
+          "type": "Chaotic Mobile",
+          "behavior": "Rolls erratically, bounces around, no predictable path",
+          "attack": {
+            "contact_damage": 5,
+            "no_direct_attacks": true,
+            "effect": "Just collision threat"
+          },
+          "health": 22,
+          "spawn_rate": "Uncommon",
+          "strategy": "Predict patterns (they emerge after observation). Use obstacles to funnel it.",
+          "twist": "Collides with other enemies (pushes them). Can use stool as dynamic obstacle."
+        },
+        {
+          "id": "spinning_ruler",
+          "name": "Spinning Ruler",
+          "icon": "📏",
+          "description": "Wooden ruler spinning rapidly on desk",
+          "type": "Stationary Barrier",
+          "behavior": "Stationary, spins in place, blocks movement",
+          "attack": {
+            "contact_damage": 6,
+            "when_spinning": "Always dangerous",
+            "recovery_frames": false
+          },
+          "health": 28,
+          "spawn_rate": "Easy",
+          "strategy": "Attack from gaps between ruler edges. Use it as cover from OTHER enemies' attacks.",
+          "twist": "Blocks both your AND enemy projectiles (double-edged). Multiple rulers can synchronize."
+        }
+      ],
+      
+      "boss": {
+        "id": "entropy",
+        "name": "Entropy",
+        "subtitle": "Disorder in the Lab",
+        "icon": "🌀",
+        "narrative": "Lab equipment breaking down. Entropy (disorder) consuming everything.",
+        "appearance": "Vortex of dissolving lab equipment (beakers, tubes, papers swirling). Purple + neon pink. Center is dark, edges show destruction.",
+        
+        "behavior": "Stationary vortex in center of arena",
+        "attack_patterns": {
+          "phase_1": {
+            "health_range": "40-27 HP",
+            "pattern": "8 equipment fragments in circular spread, rotating slowly",
+            "frequency": "1 spiral every 2 sec",
+            "projectiles": "3 damage each",
+            "mechanic": "Gaps between projectiles you can move through"
+          },
+          "phase_2": {
+            "health_range": "27-1 HP",
+            "pattern": "Spiral rotates FASTER (harder prediction)",
+            "secondary_attack": "Spawns small Spilled Liquid entities drifting outward",
+            "frequency": "1 spiral + 1 spawn every 1.5 sec",
+            "damage": "3 per fragment, 1/sec from liquid trails"
+          }
+        },
+        
+        "health": 40,
+        "phases": 1,
+        "difficulty": "Medium (first boss, learnable)",
+        "time_to_beat": "60-90 seconds with good play",
+        
+        "strategy": {
+          "phase_1": "Learn spiral rhythm, find gaps, circle around",
+          "phase_2": "Spawn-prioritize (clear liquids first), manage fragments"
+        },
+        
+        "visual_progression": "Boss grows more chaotic as phase progresses. Equipment visible inside vortex.",
+        "victory_feel": "Pattern mastery. System restored."
+      },
+
+      "hazards": [
+        {
+          "type": "electrical_sparks",
+          "description": "Occasional damage zones from broken equipment",
+          "damage": 0.5,
+          "frequency": "Low"
+        },
+        {
+          "type": "chemical_spills",
+          "description": "Puddles that damage over time",
+          "damage": 0.3,
+          "duration": "Until room cleared"
+        }
+      ],
+      
+      "hazard_philosophy": "Mostly safe. Focus on combat.",
+      "difficulty_tier": 1
+    },
+
+    "floor_2_geosphere": {
+      "floor": 2,
+      "biome": "The Rocky Depths",
+      "era": "3.8 Billion Years Ago",
+      "theme": "Ancient rocks, minerals, geological forces. Heavy, tanky, slow but devastating.",
+      "visual_palette": "Browns, grays, golds, reds. Jagged rocky rooms, crystal formations. Lava glows orange/red. Deep, ancient, solid.",
+      "feel": "Heavy, immovable, geological power. Positioning around LARGE objects.",
+      
+      "enemies": [
+        {
+          "id": "crystal_shard_colony",
+          "name": "Crystal Shard Colony",
+          "icon": "💎",
+          "description": "Cluster of glowing crystals jutting from ground",
+          "type": "Stationary Turret",
+          "behavior": "Stationary (rooted), shoots in multiple directions",
+          "attack": {
+            "pattern": "4 LARGE crystal shards in cardinal directions (N/S/E/W)",
+            "shard_size": "20% screen each",
+            "damage": 8,
+            "speed": "Slow but hard-hitting",
+            "knockback": true,
+            "rotation": "Every 2 sec, rotates 45 degrees",
+            "visual_spectacle": "After 3 rotations, explodes into smaller crystals briefly"
+          },
+          "health": 60,
+          "spawn_rate": "Common",
+          "strategy": "Attack from diagonal angles between shard lines. Position in safety zones. Kite indefinitely.",
+          "twist": "Shards embed in walls (create obstacles). Embedded crystals reflect YOUR projectiles (hazard)."
+        },
+        {
+          "id": "pressure_stone",
+          "name": "Pressure Stone",
+          "icon": "⚫",
+          "description": "Massive rounded boulder with stress fractures",
+          "type": "Mobile Juggernaut",
+          "behavior": "Moves slowly but RELENTLESSLY toward you. Never stops.",
+          "attack": {
+            "contact_damage": 12,
+            "effect": "Massive knockback (sends you flying)",
+            "secondary": "Leaves cracks in ground as it moves (create obstacles)"
+          },
+          "crack_mechanic": {
+            "damage": "3 dmg/sec standing on cracks",
+            "persistence": "Until arena fills with cracks",
+            "hazard_escalation": "Stone gets FASTER as cracks fill arena"
+          },
+          "health": 75,
+          "spawn_rate": "Common",
+          "strategy": "Lead into obstacles, use as barriers. Attack from sides while passing. Bait into crushing other enemies.",
+          "twist": "If stone hits another stone, they MERGE (larger threat). Cracks become impassable (spatial lock)."
+        },
+        {
+          "id": "thermal_vent_chimney",
+          "name": "Thermal Vent Chimney",
+          "icon": "🌋",
+          "description": "Vertical rock column with steam radiating visibly",
+          "type": "Stationary Eruption",
+          "behavior": "Stationary (anchored). Erupts periodically.",
+          "attack": {
+            "eruption_frequency": "Every 3 sec",
+            "pattern": "Expanding shockwave in ALL directions",
+            "damage": 7,
+            "knockback": true,
+            "aftermath": "Leaves hot zone (2 dmg/sec standing in it)",
+            "zone_duration": "8 sec, gradually cools"
+          },
+          "health": 45,
+          "spawn_rate": "Uncommon",
+          "strategy": "Time attacks between eruptions. When eruption happens, move TOWARD vent (safest zone is center). Attack from hot zones (risky but effective).",
+          "twist": "Multiple vents create LAYERED eruptions (cascading waves). If vents sync, massive combined shockwave (devastating)."
+        },
+        {
+          "id": "fault_line_fissure",
+          "name": "Fault Line Fissure",
+          "icon": "⛰️",
+          "description": "Self-propagating crack system - creates geometry",
+          "type": "Fractal Enemy (Signature)",
+          "tier_1_primary": {
+            "size": "Large diagonal crack",
+            "health": 50,
+            "behavior": "Moves slowly in one direction, creates cracks",
+            "attack": "Contact: 8 dmg. Cracks left behind: 2 dmg/sec",
+            "crack_mechanic": "Cracks block movement (must navigate around)",
+            "spawn_secondary": "Every 2 sec, splits off secondary fault"
+          },
+          "tier_2_secondary": {
+            "spawn_count": "2-3",
+            "health_per": 30,
+            "behavior": "Moves in slightly different direction",
+            "attack": "Shoots smaller crack projectiles forward",
+            "cracks_created": "Smaller cracks (1 dmg/sec, 6 sec duration)"
+          },
+          "tier_3_minor": {
+            "spawn_count": "4-6",
+            "health_per": 15,
+            "behavior": "Mostly stationary",
+            "attack": "Shoots mini-crack projectiles slowly",
+            "cracks_created": "Tiny cracks (0.5 dmg/sec, 3 sec)"
+          },
+          "intersection_mechanic": {
+            "effect": "When faults cross, HIGH-DAMAGE ZONES appear (5 dmg/sec)",
+            "impassable": "Intersections block everything",
+            "strategic": "Can create intentional sealed zones"
+          },
+          "spawn_rate": "Uncommon",
+          "difficulty": "Hard (complex spatial management)",
+          "strategy": {
+            "containment": "Kill primary quickly before splits",
+            "navigation": "Let faults split, use pattern as cover",
+            "spatial_lock": "Let faults fill arena (high-risk, forces aggression)"
+          },
+          "twist": "Faults create 'sealed zones' (completely surrounded by cracks). Faults can collide with other enemies (push them, create chains)."
+        },
+        {
+          "id": "tremor_beetle",
+          "name": "Tremor Beetle",
+          "icon": "🪲",
+          "description": "Giant crystalline beetle with bioluminescent spots",
+          "type": "Mobile Shockwave",
+          "behavior": "Mobile, moves erratically. Stomps periodically.",
+          "attack": {
+            "contact_damage": 6,
+            "stomp_attack": "Shockwave in 360 arc, 5 dmg, knockback",
+            "stun": "Brief stun (0.5 sec) if hit by stomp",
+            "frequency": "Every 1.5 sec"
+          },
+          "health": 35,
+          "spawn_rate": "Uncommon",
+          "strategy": "Timing-based: dodge stomps, attack during wind-up. When beetle stomps, briefly vulnerable (recovery frames). Bait stomps into walls.",
+          "twist": "Multiple beetles create RESONANT STOMPS (amplify each other). If beetles stomp in sync, massive combined shockwave (devastating). Beetle shells partially reflect projectiles (armor)."
+        },
+        {
+          "id": "mineral_spike",
+          "name": "Mineral Spike",
+          "icon": "🔺",
+          "description": "Sharp mineral formation jutting from ground",
+          "type": "Passive Hazard Enemy",
+          "behavior": "Mostly stationary, grows/shrinks periodically",
+          "attack": {
+            "contact_damage": 8,
+            "growth_cycle": "Expands then retracts every 3 sec",
+            "expansion": "Takes up more space (blocks movement)",
+            "retraction": "Creates window to attack or pass"
+          },
+          "health": 32,
+          "spawn_rate": "Common",
+          "strategy": "Time movement/attacks to expansion cycle. Attack during retraction. Use expanded state as cover.",
+          "twist": "Multiple spikes can interlock (create impossible geometry). Growing spikes can crush other enemies."
+        }
+      ],
+      
+      "boss": {
+        "id": "tectonic_titan",
+        "name": "Tectonic Titan",
+        "subtitle": "Earth's Power",
+        "icon": "🏔️",
+        "narrative": "Raw geological force moving through the world.",
+        "appearance": "Massive animated stone/mountain entity. Cracks visible on surface. Ominous, immovable.",
+        
+        "behavior": "Mobile, slow, devastating. Charges at player",
+        "attack_patterns": {
+          "charge_attack": {
+            "description": "Builds up then charges in straight line",
+            "damage": 15,
+            "knockback": "Massive"
+          },
+          "earthquake_waves": {
+            "description": "Creates earthquake waves across entire screen",
+            "pattern": "Multiple radial waves emanating from boss",
+            "damage": 5,
+            "frequency": "Every 4 sec"
+          },
+          "shockwave_aftermath": {
+            "description": "After earthquake, creates cracks in terrain",
+            "effect": "Restricts movement space"
+          }
+        },
+        
+        "health": 80,
+        "phases": 1,
+        "scaling": "2x Entropy boss",
+        "difficulty": "Hard",
+        "time_to_beat": "90-120 seconds with good play",
+        
+        "strategy": "Dodge charges by moving perpendicular. Use terrain to block charges. Attack from sides during recovery.",
+        "visual_progression": "Boss cracks intensify. Ground destabilizes."
+      },
+
+      "hazards": [
+        {
+          "type": "lava_pools",
+          "description": "Instant high damage zones",
+          "damage": 3.0,
+          "avoidable": true
+        },
+        {
+          "type": "earthquakes",
+          "description": "Screen shakes, cracks appear that trap you",
+          "damage": 0.5,
+          "mechanic": "Movement restriction during tremors"
+        },
+        {
+          "type": "pressure_zones",
+          "description": "Deep areas slow you significantly",
+          "damage": 0.2,
+          "mechanic": "Reduced speed multiplier"
+        },
+        {
+          "type": "collapsing_terrain",
+          "description": "Stands crumble, must move to avoid",
+          "damage": 2.0,
+          "mechanic": "Environmental puzzle element"
+        }
+      ],
+      
+      "hazard_philosophy": "Heavy, dangerous terrain. Must navigate carefully. Spatial awareness critical.",
+      "difficulty_tier": 2
+    },
+
+    "floor_3_hydrosphere": {
+      "floor": 3,
+      "biome": "The Flooded Depths",
+      "era": "2.4 Billion Years Ago",
+      "theme": "Fluid, reactive, proto-biological. Alive but alien. Unpredictable.",
+      "visual_palette": "Deep blues, teals, purples. Murky water, bioluminescent greens/yellows. Primordial feeling. Pressure visible.",
+      "feel": "Alive but alien, unpredictable. Survival mechanic layer (air, pressure, currents).",
+      
+      "enemies": [
+        {
+          "id": "primordial_blob",
+          "name": "Primordial Blob",
+          "icon": "💧",
+          "description": "Amorphous mass that splits when hit",
+          "type": "Splitting Propagator",
+          "behavior": "Drifts, splits when damaged",
+          "attack": {
+            "contact_damage": 2,
+            "spread": "Contaminates area",
+            "splitting": "When hit, splits into 2 smaller versions (creates tactical choice)"
+          },
+          "health": 8,
+          "spawn_rate": "Common",
+          "strategy": "Either kill quickly before splits or manage all fragments. Tactical choice each room.",
+          "twist": "Splits create smaller threats but also more projectile targets. Can use splits against other enemies."
+        },
+        {
+          "id": "thermal_vent",
+          "name": "Thermal Vent",
+          "icon": "🌊",
+          "description": "Stationary vent shooting hot water",
+          "type": "Stationary Spray",
+          "behavior": "Anchored to location, shoots projectiles",
+          "attack": {
+            "pattern": "Ranged hot water projectiles",
+            "debuff": "Burning",
+            "frequency": "Regular bursts"
+          },
+          "health": 10,
+          "spawn_rate": "Common",
+          "strategy": "Avoid spray zones. Attack from sides or when vent recovers.",
+          "twist": "Heat can ignite other enemies or environmental elements."
+        },
+        {
+          "id": "chemical_reaction",
+          "name": "Chemical Reaction",
+          "icon": "⚗️",
+          "description": "Spreading chemical cloud that contaminates",
+          "type": "Area Controller",
+          "behavior": "Expanding cloud that spreads across arena",
+          "attack": {
+            "persistent_zone": "Damage zone, poison debuff",
+            "spread_mechanic": "Grows over time, blocks movement",
+            "containment": "Can be blocked by obstacles"
+          },
+          "health": 6,
+          "spawn_rate": "Uncommon",
+          "strategy": "Kill quickly before it covers too much space. Funnel it into corners. Use room layout defensively.",
+          "twist": "Can combine with other hazards (reacts with lava, electricity). Enemies touching it become poisoned (extra damage to them)."
+        },
+        {
+          "id": "proto_swimmer",
+          "name": "Proto-Swimmer",
+          "icon": "🐟",
+          "description": "Fast, erratic, first 'alive' feeling entity",
+          "type": "Intelligent Mobile",
+          "behavior": "Quick, unpredictable movement patterns (first truly 'intelligent' enemy)",
+          "attack": {
+            "swift_strikes": "Hard to predict",
+            "contact_damage": 0.9,
+            "pattern": "Erratic, adapts to player"
+          },
+          "health": 7,
+          "spawn_rate": "Uncommon",
+          "difficulty": "Medium (feels different from Floor 1/2)",
+          "strategy": "Requires quick reflexes. Pattern observation critical.",
+          "twist": "First enemy that feels like it's 'learning' your moves."
+        },
+        {
+          "id": "pressure_squid",
+          "name": "Pressure Squid",
+          "icon": "🦑",
+          "description": "Deep-sea creature with pressure aura",
+          "type": "Mobile Aura",
+          "behavior": "Moves around, radiates pressure field",
+          "attack": {
+            "contact_damage": 5,
+            "aura_effect": "Radius around it applies pressure debuff (slows + damage)",
+            "debuff_range": "Large area"
+          },
+          "health": 20,
+          "spawn_rate": "Uncommon",
+          "strategy": "Attack from outside aura range. Create distance.",
+          "twist": "Multiple squids' auras can stack (creates hazardous zones). Aura can crush other enemies."
+        },
+        {
+          "id": "coral_formation",
+          "name": "Coral Formation",
+          "icon": "🪸",
+          "description": "Growing coral that blocks movement",
+          "type": "Passive Barrier",
+          "behavior": "Mostly stationary, grows periodically",
+          "attack": {
+            "contact_damage": 3,
+            "growth": "Expands, blocking routes",
+            "shrinkage": "Creates window to pass"
+          },
+          "health": 18,
+          "spawn_rate": "Common",
+          "strategy": "Time movement to growth cycles. Attack during shrinkage windows.",
+          "twist": "Can create temporary walls that block enemy movement (advantage to you)."
+        }
+      ],
+      
+      "boss": {
+        "id": "the_nucleus",
+        "name": "The Nucleus",
+        "subtitle": "First Life",
+        "icon": "🧬",
+        "narrative": "Life emerges from chaos. Primordial cell consciousness.",
+        "appearance": "Large glowing cell with visible organelles inside. Bioluminescent. Alien but alive.",
+        
+        "behavior": "Starts as single large cell. Spawns organelle enemies around it. When damaged enough, splits.",
+        "attack_patterns": {
+          "phase_1": {
+            "health_range": "120-61 HP",
+            "pattern": "Releases organelle projectiles",
+            "spreads_contamination": true,
+            "frequency": "Regular bursts"
+          },
+          "phase_2": {
+            "health_range": "60-1 HP",
+            "behavior": "Splits into smaller nuclei (2-3 spawn)",
+            "mechanic": "Each nucleus shoots independently",
+            "coordination": "Nuclei try to surround player"
+          }
+        },
+        
+        "health": 120,
+        "phases": 2,
+        "scaling": "1.5x Tectonic boss",
+        "difficulty": "Hard",
+        "time_to_beat": "120-150 seconds with good play",
+        
+        "strategy": {
+          "phase_1": "Learn spray rhythm, dodge projectiles, damage nucleus",
+          "phase_2": "Manage multiple nuclei, choose which to prioritize"
+        },
+        
+        "visual_progression": "Nucleus glows brighter. Organelles become more visible. Split is visually spectacular."
+      },
+
+      "hazards": [
+        {
+          "type": "drowning",
+          "description": "Stay underwater too long = damage",
+          "damage": 1.0,
+          "mechanic": "Must surface for air periodically"
+        },
+        {
+          "type": "pressure_damage",
+          "description": "Deeper zones deal more damage",
+          "damage": 0.5,
+          "scaling": "Increases with depth"
+        },
+        {
+          "type": "toxic_clouds",
+          "description": "Chemical hazard clouds",
+          "damage": 0.7,
+          "mechanic": "Poison debuff on contact"
+        },
+        {
+          "type": "currents",
+          "description": "Push you in directions, hard to resist",
+          "damage": 0,
+          "mechanic": "Movement redirection puzzle"
+        }
+      ],
+      
+      "hazard_philosophy": "Must manage air, pressure, currents. Survival layer adds complexity.",
+      "difficulty_tier": 3
+    },
+
+    "floor_4_atmosphere": {
+      "floor": 4,
+      "biome": "The Tempest",
+      "era": "540 Million Years Ago",
+      "theme": "Weather, energy, chaos. Fast, explosive, dangerous.",
+      "visual_palette": "Bright yellows, electric blues, storm grays. High energy, particle effects. Clouds, lightning, radiation.",
+      "feel": "Chaotic, dangerous, high-energy. Reflexes and prediction critical.",
+      
+      "enemies": [
+        {
+          "id": "storm_vortex",
+          "name": "Storm Vortex",
+          "icon": "🌪️",
+          "description": "Spinning entity creating wind pushback",
+          "type": "Mobile Wind",
+          "behavior": "Rotates, creates wind effects",
+          "attack": {
+            "pushback_damage": "Knockback effect",
+            "contact_damage": 0.8,
+            "effect": "Can throw you off-balance"
+          },
+          "health": 11,
+          "spawn_rate": "Common",
+          "strategy": "Use wind pushback tactically. Position yourself.",
+          "twist": "Wind can push other enemies (create chain reactions)."
+        },
+        {
+          "id": "lightning_strike",
+          "name": "Lightning Strike",
+          "icon": "⚡",
+          "description": "Fast teleporting striker",
+          "type": "Teleporter",
+          "behavior": "Teleports around, instant strikes",
+          "attack": {
+            "dash_attacks": "High-speed strikes",
+            "contact_damage": 1.3,
+            "predictability": "Requires quick reflexes"
+          },
+          "health": 9,
+          "spawn_rate": "Common",
+          "difficulty": "Medium (unpredictable)",
+          "strategy": "Pattern recognition. Where WILL it strike next?",
+          "twist": "Can chain strike between enemies (create cascades)."
+        },
+        {
+          "id": "solar_flare",
+          "name": "Solar Flare",
+          "icon": "☀️",
+          "description": "Burst damage radiating outward",
+          "type": "Exploding Burst",
+          "behavior": "Periodically releases energy burst",
+          "attack": {
+            "explosion": "Damage in radius",
+            "debuff": "Burning",
+            "frequency": "Periodic"
+          },
+          "health": 12,
+          "spawn_rate": "Uncommon",
+          "strategy": "Predict burst timing, move away before explosion.",
+          "twist": "Explosions can trigger other enemies' attacks (cause chains)."
+        },
+        {
+          "id": "pressure_wave",
+          "name": "Pressure Wave",
+          "icon": "〰️",
+          "description": "Sound/force entity creating linear shockwaves",
+          "type": "Linear Sweeper",
+          "behavior": "Creates shockwave walls that move across screen",
+          "attack": {
+            "pattern": "Linear damage zone",
+            "knockback": true,
+            "frequency": "Regular intervals"
+          },
+          "health": 10,
+          "spawn_rate": "Uncommon",
+          "strategy": "Dodge predictable wave patterns. Pattern-based challenge.",
+          "twist": "Waves can resonate (amplify each other if multiple)."
+        },
+        {
+          "id": "radiation_cell",
+          "name": "Radiation Cell",
+          "icon": "☢️",
+          "description": "Glowing radioactive entity",
+          "type": "Mobile Radiation",
+          "behavior": "Drifts around, radiates constantly",
+          "attack": {
+            "aura_damage": "Continuous radiation zone",
+            "contact_damage": 4,
+            "avoidance": "Must maintain distance"
+          },
+          "health": 14,
+          "spawn_rate": "Uncommon",
+          "strategy": "Keep distance, attack from range. Avoid aura.",
+          "twist": "Aura can combine with other radiation (hazard escalation)."
+        },
+        {
+          "id": "frost_shard",
+          "name": "Frost Shard",
+          "icon": "❄️",
+          "description": "Crystalline ice formation",
+          "type": "Slowing Hazard",
+          "behavior": "Mobile or stationary, emits cold",
+          "attack": {
+            "cold_effect": "Slows movement",
+            "contact_damage": 3,
+            "debuff": "Freeze (strong slow)"
+          },
+          "health": 15,
+          "spawn_rate": "Common",
+          "strategy": "Attack while mobile, avoid contact.",
+          "twist": "Cold can freeze other enemies (create tactical advantage)."
+        }
+      ],
+      
+      "boss": {
+        "id": "stellar_furnace",
+        "name": "Stellar Furnace",
+        "subtitle": "Energy Enabling Life",
+        "icon": "🔥",
+        "narrative": "Sun's power drives everything. Core of all energy.",
+        "appearance": "Massive burning sphere radiating heat. Waves of energy visible. Ominous but beautiful.",
+        
+        "behavior": "Stationary burning sphere. Radiates heat waves. Charges for major burst attacks.",
+        "attack_patterns": {
+          "radiating_patterns": {
+            "description": "Waves of heat radiating outward in patterns",
+            "damage": 5,
+            "frequency": "Every 3 sec"
+          },
+          "charged_burst": {
+            "description": "Builds up then releases massive burst",
+            "damage": 12,
+            "area": "Large radius"
+          },
+          "pattern_variation": "Patterns change mid-fight (keeps you guessing)"
+        },
+        
+        "health": 160,
+        "phases": 1,
+        "scaling": "1.33x Nucleus boss",
+        "difficulty": "Hard",
+        "time_to_beat": "120-150 seconds with good play",
+        
+        "strategy": "Learn heat wave patterns. Predict bursts. Attack during recovery.",
+        "visual_progression": "Furnace burns brighter. Heat waves become more intense."
+      },
+
+      "hazards": [
+        {
+          "type": "radiation_zones",
+          "description": "Damage over time, must find safe zones",
+          "damage": 0.6,
+          "mechanic": "Must avoid or find protection"
+        },
+        {
+          "type": "extreme_cold",
+          "description": "Slows movement significantly",
+          "damage": 0.2,
+          "mechanic": "Speed reduction debuff"
+        },
+        {
+          "type": "strong_winds",
+          "description": "Push you, hard to resist",
+          "damage": 0,
+          "mechanic": "Movement redirection, requires positioning"
+        },
+        {
+          "type": "low_gravity_zones",
+          "description": "Floaty movement, different physics",
+          "damage": 0,
+          "mechanic": "Mobility challenge, higher jumps"
+        }
+      ],
+      
+      "hazard_philosophy": "Energy hazards, environmental physics puzzle. Fast-paced.",
+      "difficulty_tier": 4
+    },
+
+    "floor_5_biosphere": {
+      "floor": 5,
+      "biome": "The Origin",
+      "era": "Present Day (and Beyond)",
+      "theme": "Complex, intelligent, evolved. ALL SYSTEMS AT ONCE. Chaos and mastery.",
+      "visual_palette": "Every color, organic shapes. Living forests, vines, symbiotic structures. Reality shifts. Impossible geometry.",
+      "feel": "Intelligent, adaptive, pinnacle of evolution. PURE CHAOS. Final exam.",
+      
+      "enemies": [
+        {
+          "id": "predator",
+          "name": "Predator",
+          "icon": "🦁",
+          "description": "Hunts you intelligently, learns patterns",
+          "type": "Adaptive Hunter",
+          "behavior": "Adapts to player behavior mid-fight",
+          "attack": {
+            "intelligent_targeting": "Predicts your moves",
+            "predicted_strikes": "Hard to evade",
+            "learning": "Gets smarter as player repeats actions"
+          },
+          "health": 14,
+          "spawn_rate": "Common",
+          "difficulty": "Hard (feels alive)",
+          "strategy": "Change tactics. Don't be predictable.",
+          "twist": "First enemy that feels like true opposition."
+        },
+        {
+          "id": "symbiote",
+          "name": "Symbiote",
+          "icon": "🧬",
+          "description": "Merges with other enemies, strengthens them",
+          "type": "Tactical Support",
+          "behavior": "Seeks out other enemies to bond with",
+          "attack": {
+            "contact_damage": 0.5,
+            "bonding": "Strengthens nearby enemies (multiplier on their damage)",
+            "priority_target": "Kill symbiote first or it buffs others"
+          },
+          "health": 8,
+          "spawn_rate": "Uncommon",
+          "strategy": "Tactical priority: eliminate symbiote before it bonds.",
+          "twist": "Creates team dynamics. Must manage threat prioritization."
+        },
+        {
+          "id": "consciousness_node",
+          "name": "Consciousness Node",
+          "icon": "🧠",
+          "description": "Stationary anchor that controls all enemies",
+          "type": "Commander",
+          "behavior": "Anchor point that coordinates all enemies",
+          "attack": {
+            "direct_damage": 0,
+            "command_effect": "Coordinates other enemies, boost their behavior",
+            "command_range": "Whole arena"
+          },
+          "health": 16,
+          "spawn_rate": "Uncommon",
+          "strategy": "Destroy consciousness node to disable enemy coordination.",
+          "twist": "Destroying it dramatically changes room difficulty."
+        },
+        {
+          "id": "apex",
+          "name": "Apex",
+          "icon": "👑",
+          "description": "Combines best traits of all previous enemies",
+          "type": "Master Enemy",
+          "behavior": "Uses attacks from ALL previous enemy types",
+          "attack": {
+            "pattern_rotation": "Cycles through all floor enemy patterns",
+            "contact_damage": 1.4,
+            "adaptation": "Learns what works against you"
+          },
+          "health": 18,
+          "spawn_rate": "Rare",
+          "difficulty": "Extreme (final exam)",
+          "strategy": "Must know all enemy patterns. Test of mastery.",
+          "twist": "Defeating it feels like understanding the whole system."
+        },
+        {
+          "id": "reality_rift",
+          "name": "Reality Rift",
+          "icon": "🌌",
+          "description": "Tears in reality creating chaos",
+          "type": "Dimensional",
+          "behavior": "Opens rifts that teleport player/enemies",
+          "attack": {
+            "teleportation": "Random positioning",
+            "contact_damage": 2,
+            "unpredictability": "Chaos embodied"
+          },
+          "health": 12,
+          "spawn_rate": "Uncommon",
+          "difficulty": "Chaotic",
+          "strategy": "Adapt to randomness. No prediction possible.",
+          "twist": "Can create advantageous teleports (good RNG wins runs)."
+        },
+        {
+          "id": "void_entity",
+          "name": "Void Entity",
+          "icon": "⚫",
+          "description": "Being from outside reality",
+          "type": "Incomprehensible",
+          "behavior": "Moves in impossible ways",
+          "attack": {
+            "reality_damage": "Ignores normal physics",
+            "contact_damage": 3,
+            "debuff": "Confusion (erratic player movement)"
+          },
+          "health": 19,
+          "spawn_rate": "Rare",
+          "difficulty": "Extreme",
+          "strategy": "Requires intuition more than skill.",
+          "twist": "Last boss-tier regular enemy. Feels otherworldly."
+        }
+      ],
+      
+      "boss": {
+        "id": "the_infinitum",
+        "name": "The Infinitum",
+        "subtitle": "All Systems Combined",
+        "icon": "♾️",
+        "narrative": "All knowledge, all life, all systems at once. Source of everything. The origin understanding.",
+        "appearance": "Shifts between all previous boss visual styles. Reality unstable around it. Beautiful and terrifying.",
+        
+        "behavior": "Shifts between all previous boss forms. Uses attacks from all previous bosses. Adapts to your playstyle.",
+        "attack_patterns": {
+          "phase_1_entropy": {
+            "health_range": "240-161 HP",
+            "pattern": "Uses Entropy (vortex) attacks",
+            "style": "Disorder and chaos"
+          },
+          "phase_2_tectonic": {
+            "health_range": "160-81 HP",
+            "pattern": "Uses Tectonic Titan (charge, earthquakes) attacks",
+            "style": "Immovable force"
+          },
+          "phase_3_infinitum": {
+            "health_range": "80-1 HP",
+            "pattern": "Combines ALL previous bosses attacks",
+            "adaptation": "Learns what attacks work against you",
+            "final_form": "True form emerges as you destroy it"
+          }
+        },
+        
+        "health": 240,
+        "phases": 3,
+        "scaling": "6x Entropy (but spread across 3 phases)",
+        "difficulty": "Extreme (final boss)",
+        "time_to_beat": "180-240 seconds with mastery",
+        
+        "strategy": {
+          "phase_1": "Use Entropy knowledge (pattern learning)",
+          "phase_2": "Use Tectonic knowledge (positioning)",
+          "phase_3": "Combine everything. Mastery test."
+        },
+        
+        "victory_feel": "Complete understanding. All systems understood. Transcendence.",
+        "post_victory_narrative": "You understand. You return to the Lab, but changed. Ready to begin again with new knowledge."
+      },
+
+      "hazards": [
+        {
+          "type": "reality_instability",
+          "description": "Random teleports, terrain shifts",
+          "damage": 1.0,
+          "mechanic": "Unpredictable environmental chaos"
+        },
+        {
+          "type": "all_previous_hazards",
+          "description": "Every hazard from all floors happening simultaneously",
+          "damage": "Varies",
+          "mechanic": "Pure chaos, must adapt constantly"
+        },
+        {
+          "type": "symbiotic_bonds",
+          "description": "Enemies link together, sharing damage/effects",
+          "damage": "Shared",
+          "mechanic": "Tactical complexity layer"
+        },
+        {
+          "type": "living_obstacles",
+          "description": "Creatures block paths, organic maze",
+          "damage": 0.5,
+          "mechanic": "Environmental navigation puzzle"
+        }
+      ],
+      
+      "hazard_philosophy": "EVERYTHING AT ONCE. Final test of complete mastery.",
+      "difficulty_tier": 5
+    }
+  },
+
+  "enemy_architecture": {
+    "template": {
+      "id": "unique_id",
+      "name": "Name",
+      "icon": "emoji",
+      "description": "One-liner",
+      "type": "Enemy Type Category",
+      "behavior": "How it moves/acts",
+      "attack": {
+        "primary": "Main attack",
+        "secondary": "Secondary effect",
+        "frequency": "How often"
+      },
+      "health": "Hits to kill",
+      "spawn_rate": "Common/Uncommon/Rare",
+      "strategy": "How to fight",
+      "twist": "Unique mechanic"
+    },
+    
+    "scaling_rules": [
+      "Each floor has 6 unique enemies + 1 boss",
+      "Boss health scales: Entropy (40) → Tectonic (80) → Nucleus (120) → Furnace (160) → Infinitum (240)",
+      "Infinitum is 6x Entropy but spread across 3 phases",
+      "Each floor can have post-MVP boss variants (same health, different patterns)",
+      "Enemy health pools scale with player progression (artifacts, specializations, health)"
+    ]
+  },
+
+  "narrative_progression": {
+    "start": "You wake up in The Lab (modern day). Ready to descend.",
+    "floor_1_to_2": "Entropy breaks the lab. You descend deeper to escape...",
+    "floor_2_to_3": "Tectonic forces push you down. You break through into water...",
+    "floor_3_to_4": "The Nucleus pulses. You rise upward through the layers...",
+    "floor_4_to_5": "The Stellar Furnace burns. You emerge into the Biosphere...",
+    "floor_5_boss": "The Infinitum. All systems at once. The source of everything.",
+    "victory": "You understand. You return to the Lab, but changed. Ready to begin again."
+  },
+
+  "ui_storytelling": {
+    "floor_entry_format": "[FLOOR_NAME] - [ERA_DESCRIPTION]",
+    "examples": [
+      "THE INFINITE LAB - Modern Day",
+      "THE ROCKY DEPTHS - 3.8 Billion Years Ago",
+      "THE FLOODED DEPTHS - 2.4 Billion Years Ago",
+      "THE TEMPEST - 540 Million Years Ago",
+      "THE ORIGIN - Present Day (and Beyond)"
+    ],
+    "enemy_descriptions": "Hint at evolution and system role",
+    "specialization_unlocks": "Unlock with narrative context (Paleontology after Tectonic Titan)"
+  },
+
+  "combat_design_philosophy": {
+    "twin_stick_friendly": "Kiting, positioning, pattern learning are core",
+    "emergent_interactions": "Enemies affecting each other creates dynamic rooms",
+    "learning_curve": "Floor 1 is learnable, each floor increases complexity",
+    "fractal_enemies": "One signature enemy per floor creates replayability through mastery",
+    "boss_as_test": "Each boss tests mastery of that floor's lessons"
+  }
+}

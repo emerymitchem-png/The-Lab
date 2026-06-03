@@ -1,0 +1,385 @@
+{
+  "artifact_system": {
+    "description": "Two separate artifact types: Consumable artifacts (permanent stat boost) and Weapon artifacts (2-slot system with infinite craft combinations)",
+    
+    "consumable_artifacts": {
+      "mechanics": {
+        "type": "One-time use, consumed upon pickup",
+        "effect": "Permanent stat boost (stacks)",
+        "stacking": "Multiple of same type stack (2 Burritos = +4 health)",
+        "auto_apply": true,
+        "no_inventory": "Applied immediately, doesn't take inventory space"
+      },
+      
+      "consumable_types": [
+        {
+          "id": "burrito",
+          "name": "Burrito",
+          "icon": "🌯",
+          "effect": "+2 max health",
+          "type": "food",
+          "rarity": "common"
+        },
+        {
+          "id": "energy_drink",
+          "name": "Energy Drink",
+          "icon": "🥤",
+          "effect": "+0.1 speed multiplier",
+          "type": "beverage",
+          "rarity": "common"
+        },
+        {
+          "id": "protein_bar",
+          "name": "Protein Bar",
+          "icon": "🍫",
+          "effect": "+0.05 damage multiplier",
+          "type": "food",
+          "rarity": "uncommon"
+        },
+        {
+          "id": "stimulant",
+          "name": "Stimulant",
+          "icon": "⚡",
+          "effect": "+0.15 speed multiplier",
+          "type": "chemical",
+          "rarity": "rare"
+        },
+        {
+          "id": "steroid",
+          "name": "Steroid",
+          "icon": "💪",
+          "effect": "+0.2 damage multiplier",
+          "type": "chemical",
+          "rarity": "rare"
+        }
+      ],
+
+      "drop_rates": {
+        "normal_room": 0.15,
+        "rare_room": 0.25,
+        "secret_room": 0.35
+      }
+    },
+
+    "weapon_artifacts": {
+      "description": "Modular weapon system. 2 slots that combine for different projectile effects.",
+      "slots": 2,
+      "mechanics": {
+        "both_slots_optional": "Can have 0, 1, or 2 equipped",
+        "slot_combination": "Slot 1 + Slot 2 = combined projectile stats",
+        "single_slot": "One artifact affects projectile in that direction",
+        "empty_slot": "Uses default/specialization projectile"
+      },
+
+      "drop_restriction": {
+        "rule": "Cannot drop weapon artifacts unless you have found 3+",
+        "purpose": "Force early commitment to discovered weapons",
+        "unlock": "Once 3rd artifact found, player can choose which to keep"
+      },
+
+      "combination_system": {
+        "mechanics": "Infinite Craft style - combinations create new base artifacts",
+        "example": {
+          "artifact_a": "Battery",
+          "artifact_b": "Microscope",
+          "combined": "Electron Microscope",
+          "result": "New base artifact added to loot pool at same drop rate",
+          "chaining": "Electron Microscope can combine with other artifacts"
+        },
+        "permanent_unlock": "Once discovered, new artifact is forever available as base drop"
+      },
+
+      "base_weapon_artifacts": [
+        {
+          "id": "battery",
+          "name": "Battery",
+          "icon": "🔋",
+          "description": "Power source. Increases projectile damage.",
+          "stats": {
+            "damage_multiplier": 1.2,
+            "speed_multiplier": 1.0,
+            "effect": null
+          },
+          "rarity": "common",
+          "combinations": [
+            {
+              "with": "Microscope",
+              "creates": "Electron Microscope"
+            },
+            {
+              "with": "Lens",
+              "creates": "Powered Lens"
+            }
+          ]
+        },
+        {
+          "id": "microscope",
+          "name": "Microscope",
+          "icon": "🔬",
+          "description": "Magnification. Increases precision and speed.",
+          "stats": {
+            "damage_multiplier": 1.0,
+            "speed_multiplier": 1.25,
+            "effect": "Smaller, faster projectiles"
+          },
+          "rarity": "common",
+          "combinations": [
+            {
+              "with": "Battery",
+              "creates": "Electron Microscope"
+            },
+            {
+              "with": "Light Source",
+              "creates": "Illuminated Microscope"
+            }
+          ]
+        },
+        {
+          "id": "lens",
+          "name": "Lens",
+          "icon": "🔍",
+          "description": "Focus. Concentrates projectile energy.",
+          "stats": {
+            "damage_multiplier": 1.15,
+            "speed_multiplier": 1.1,
+            "effect": "Focused beam effect"
+          },
+          "rarity": "uncommon",
+          "combinations": [
+            {
+              "with": "Prism",
+              "creates": "Spectroscope"
+            },
+            {
+              "with": "Battery",
+              "creates": "Powered Lens"
+            }
+          ]
+        },
+        {
+          "id": "prism",
+          "name": "Prism",
+          "icon": "🌈",
+          "description": "Refraction. Splits projectiles.",
+          "stats": {
+            "damage_multiplier": 1.0,
+            "speed_multiplier": 1.0,
+            "effect": "Projectiles split into multiple smaller projectiles"
+          },
+          "rarity": "uncommon",
+          "combinations": [
+            {
+              "with": "Lens",
+              "creates": "Spectroscope"
+            },
+            {
+              "with": "Light Source",
+              "creates": "Rainbow Generator"
+            }
+          ]
+        },
+        {
+          "id": "light_source",
+          "name": "Light Source",
+          "icon": "💡",
+          "description": "Illumination. Makes projectiles glow and reveal.",
+          "stats": {
+            "damage_multiplier": 1.05,
+            "speed_multiplier": 1.0,
+            "effect": "Projectiles light up dark areas"
+          },
+          "rarity": "common",
+          "combinations": [
+            {
+              "with": "Microscope",
+              "creates": "Illuminated Microscope"
+            },
+            {
+              "with": "Prism",
+              "creates": "Rainbow Generator"
+            }
+          ]
+        }
+      ],
+
+      "discovered_combinations": [
+        {
+          "id": "electron_microscope",
+          "name": "Electron Microscope",
+          "icon": "⚛️",
+          "description": "Powerful magnification with energy.",
+          "created_from": "Battery + Microscope",
+          "stats": {
+            "damage_multiplier": 1.35,
+            "speed_multiplier": 1.25,
+            "effect": "Fast, powerful projectiles with penetration"
+          },
+          "rarity": "rare",
+          "base_drop_rate": 0.03,
+          "combinations": [
+            {
+              "with": "Lens",
+              "creates": "Ultra Microscope"
+            },
+            {
+              "with": "Prism",
+              "creates": "Quantum Microscope"
+            }
+          ]
+        },
+        {
+          "id": "spectroscope",
+          "name": "Spectroscope",
+          "icon": "📊",
+          "description": "Analysis tool. Creates spectrum projectiles.",
+          "created_from": "Lens + Prism",
+          "stats": {
+            "damage_multiplier": 1.2,
+            "speed_multiplier": 1.15,
+            "effect": "Rainbow projectiles with multi-hit"
+          },
+          "rarity": "rare",
+          "base_drop_rate": 0.03,
+          "combinations": [
+            {
+              "with": "Battery",
+              "creates": "Powered Spectroscope"
+            }
+          ]
+        },
+        {
+          "id": "powered_lens",
+          "name": "Powered Lens",
+          "icon": "⚡🔍",
+          "description": "Energy-focused beam.",
+          "created_from": "Battery + Lens",
+          "stats": {
+            "damage_multiplier": 1.4,
+            "speed_multiplier": 1.1,
+            "effect": "Charged beam projectiles"
+          },
+          "rarity": "rare",
+          "base_drop_rate": 0.03,
+          "combinations": [
+            {
+              "with": "Microscope",
+              "creates": "Ultra Microscope"
+            }
+          ]
+        },
+        {
+          "id": "illuminated_microscope",
+          "name": "Illuminated Microscope",
+          "icon": "💡🔬",
+          "description": "Bright magnification.",
+          "created_from": "Microscope + Light Source",
+          "stats": {
+            "damage_multiplier": 1.1,
+            "speed_multiplier": 1.3,
+            "effect": "Fast, glowing projectiles reveal secrets"
+          },
+          "rarity": "rare",
+          "base_drop_rate": 0.03,
+          "combinations": [
+            {
+              "with": "Lens",
+              "creates": "Revelation Microscope"
+            }
+          ]
+        },
+        {
+          "id": "rainbow_generator",
+          "name": "Rainbow Generator",
+          "icon": "🌈💡",
+          "description": "Colorful spectrum burst.",
+          "created_from": "Prism + Light Source",
+          "stats": {
+            "damage_multiplier": 1.15,
+            "speed_multiplier": 1.2,
+            "effect": "Burst of colorful projectiles"
+          },
+          "rarity": "rare",
+          "base_drop_rate": 0.03,
+          "combinations": [
+            {
+              "with": "Battery",
+              "creates": "Prismatic Cannon"
+            }
+          ]
+        }
+      ],
+
+      "ultra_combinations": [
+        {
+          "id": "ultra_microscope",
+          "name": "Ultra Microscope",
+          "icon": "⚛️🔬",
+          "description": "Ultimate magnification.",
+          "created_from": "Electron Microscope + Lens OR Powered Lens + Microscope",
+          "stats": {
+            "damage_multiplier": 1.5,
+            "speed_multiplier": 1.35,
+            "effect": "Massive penetrating projectiles"
+          },
+          "rarity": "legendary",
+          "base_drop_rate": 0.01
+        },
+        {
+          "id": "quantum_microscope",
+          "name": "Quantum Microscope",
+          "icon": "🌌🔬",
+          "description": "Quantum-scale observation.",
+          "created_from": "Electron Microscope + Prism",
+          "stats": {
+            "damage_multiplier": 1.4,
+            "speed_multiplier": 1.4,
+            "effect": "Projectiles split and recombine"
+          },
+          "rarity": "legendary",
+          "base_drop_rate": 0.01
+        }
+      ]
+    },
+
+    "gameplay_loop": {
+      "early_game": {
+        "scenario": "Start with no weapon artifacts",
+        "projectile": "Uses specialization default (Cell, Atom, Seed Pod, etc.)",
+        "inventory": "0/2 weapon artifact slots"
+      },
+      "first_discovery": {
+        "scenario": "Find Battery",
+        "inventory": "1/2 weapon artifact slots",
+        "effect": "Projectiles now use Battery stats (+20% damage)",
+        "drop_choice": "Cannot drop it yet"
+      },
+      "second_discovery": {
+        "scenario": "Find Microscope",
+        "inventory": "2/2 weapon artifact slots",
+        "effect": "Two options: Equip Microscope in slot 2, or find third artifact to choose",
+        "combination_check": "Battery + Microscope = automatic combo?"
+      },
+      "third_discovery": {
+        "scenario": "Find Lens",
+        "inventory": "Would be 3/2, triggers overflow",
+        "player_choice": "Choose which 2 to keep (Battery, Microscope, or Lens)",
+        "drop_mechanic": "Can now drop one artifact",
+        "combo_happens": "If Battery + Microscope equipped, Electron Microscope created",
+        "result": "2/2 → 1/2 (Electron Microscope takes 1 slot, 1 slot open)"
+      },
+      "mid_game": {
+        "scenario": "Find Prism",
+        "inventory": "Can now equip (1/2)",
+        "result": "Electron Microscope + Prism = Quantum Microscope (if combo exists)",
+        "gameplay": "Greater damage, more variety, different playstyle"
+      }
+    },
+
+    "combo_discovery_rewards": {
+      "philosophy": "Each new combo unlocks permanently in loot tables",
+      "reward": "Combo artifact becomes base drop",
+      "progression": "Players gradually unlock more powerful combinations",
+      "meta_game": "Community discovers new combos over time"
+    }
+  }
+}

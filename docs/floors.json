@@ -1,0 +1,334 @@
+{
+  "floors": [
+    {
+      "floor": 1,
+      "biome": "lab",
+      "biome_name": "The Infinite Lab",
+      "difficulty_tier": 1,
+      "theme": "Basic cellular biology, chemistry, physics fundamentals",
+      
+      "guaranteed_rooms": {
+        "normal_rooms": 8,
+        "secret_rooms": 1,
+        "shop_room": 1,
+        "boss_room": 1,
+        "marked_unlocked_door": 1,
+        "total_guaranteed": 12
+      },
+
+      "procedural_room": {
+        "count": 1,
+        "type": "shop_or_mystery_door",
+        "probability": {
+          "shop_locked_door": 0.75,
+          "mystery_door": 0.25
+        }
+      },
+
+      "total_rooms": 13,
+
+      "locked_doors": {
+        "shop_locked_door": {
+          "count": 1,
+          "guaranteed": true,
+          "behind_key": true,
+          "visuals": "Shop theme (counter, shelves)",
+          "inside": "Safe shop room, buy items",
+          "enemy_count": 0
+        },
+        "mystery_door": {
+          "count": "0 or 1 (25% procedural)",
+          "behind_key": true,
+          "visuals": "Looks identical to shop (player confusion)",
+          "inside": "Hard enemies + rare chest (unlocked)",
+          "enemy_count": "3-5 harder enemies",
+          "difficulty": "High for floor"
+        }
+      },
+
+      "unlocked_doors": {
+        "marked_door": {
+          "count": 1,
+          "guaranteed": true,
+          "locked": false,
+          "visuals": "Visibly different from shop (distinctive marking)",
+          "inside": "Safe room, rare chest (unlocked)",
+          "contents": "Artifact, class unlock, or rare loot",
+          "enemy_count": 0
+        }
+      },
+
+      "key_economy": {
+        "expected_keys": "0-2 (average 1)",
+        "guaranteed_key": "Somewhere on floor in rare drop",
+        "tension": "Will I have enough to open both locked doors?"
+      },
+
+      "barriers": {
+        "fire": 2,
+        "sealed": 1,
+        "gaps": 1,
+        "total": 4
+      },
+
+      "consumable_availability": {
+        "match_drop_rate": 0.08,
+        "rope_drop_rate": 0.07,
+        "blowtorch_drop_rate": 0.01,
+        "breaker_bar_drop_rate": 0.00
+      },
+
+      "design_intent": "Introduction. Low tension. Learn mechanics. Discover that locked doors = shop or mystery.",
+      
+      "unlocks_after_boss": ["Microbiology", "Neuroscience"]
+    },
+
+    {
+      "floor": 2,
+      "biome": "geosphere",
+      "biome_name": "The Rocky Depths",
+      "difficulty_tier": 2,
+      "theme": "Geological formations, mineral structures, seismic activity",
+      
+      "guaranteed_rooms": {
+        "normal_rooms": 8,
+        "secret_rooms": 1,
+        "shop_room": 1,
+        "boss_room": 1,
+        "marked_unlocked_door": 1,
+        "total_guaranteed": 12
+      },
+
+      "procedural_room": {
+        "count": 1,
+        "type": "shop_or_mystery_door"
+      },
+
+      "total_rooms": 13,
+
+      "locked_doors": {
+        "shop_locked_door": {
+          "count": 1,
+          "guaranteed": true,
+          "behind_key": true
+        },
+        "mystery_door": {
+          "count": "0 or 1 (25%)",
+          "behind_key": true
+        }
+      },
+
+      "key_economy": {
+        "expected_keys": "0-2 (average 1)",
+        "tension": "Moderate - 75% safe, 25% risky"
+      },
+
+      "barriers": {
+        "rock": 3,
+        "sealed": 2,
+        "gaps": 1,
+        "total": 6
+      },
+
+      "consumable_availability": {
+        "match_drop_rate": 0.06,
+        "rope_drop_rate": 0.08,
+        "blowtorch_drop_rate": 0.02,
+        "breaker_bar_drop_rate": 0.02
+      },
+
+      "design_intent": "Standard difficulty. Player now knows locked doors = shop or mystery. Resource scarcity begins.",
+      
+      "unlocks_after_boss": ["Marine Science", "Ecology", "Hydrology"]
+    },
+
+    {
+      "floor": 3,
+      "biome": "hydrosphere",
+      "biome_name": "The Flooded Depths",
+      "difficulty_tier": 3,
+      "theme": "Water ecosystems, ice formations, aquatic life",
+      
+      "guaranteed_rooms": {
+        "normal_rooms": 8,
+        "secret_rooms": 1,
+        "shop_room": 1,
+        "boss_room": 1,
+        "marked_unlocked_door": 1,
+        "total_guaranteed": 12
+      },
+
+      "procedural_room": {
+        "count": 1,
+        "type": "shop_or_mystery_door"
+      },
+
+      "total_rooms": 13,
+
+      "locked_doors": {
+        "shop_locked_door": {
+          "count": 1,
+          "guaranteed": true,
+          "behind_key": true
+        },
+        "mystery_door": {
+          "count": "0 or 1 (25%)"
+        }
+      },
+
+      "key_economy": {
+        "expected_keys": "0-2 (average 1)",
+        "tension": "High - Not enough keys for all doors + mystery creates risk"
+      },
+
+      "barriers": {
+        "ice": 3,
+        "water": 2,
+        "gaps": 2,
+        "total": 7
+      },
+
+      "consumable_availability": {
+        "match_drop_rate": 0.04,
+        "rope_drop_rate": 0.10,
+        "blowtorch_drop_rate": 0.08,
+        "breaker_bar_drop_rate": 0.01
+      },
+
+      "design_intent": "Medium-hard. Resource scarcity + uncertainty. First 3-tier combos possible.",
+      
+      "unlocks_after_boss": ["Paleontology", "Volcanology", "Ornithology"]
+    },
+
+    {
+      "floor": 4,
+      "biome": "atmosphere",
+      "biome_name": "The Tempest",
+      "difficulty_tier": 4,
+      "theme": "Weather systems, atmospheric phenomena, extreme conditions",
+      
+      "guaranteed_rooms": {
+        "normal_rooms": 8,
+        "secret_rooms": 1,
+        "shop_room": 1,
+        "boss_room": 1,
+        "marked_unlocked_door": 1,
+        "total_guaranteed": 12
+      },
+
+      "procedural_room": {
+        "count": 1,
+        "type": "shop_or_mystery_door"
+      },
+
+      "total_rooms": 13,
+
+      "locked_doors": {
+        "shop_locked_door": {
+          "count": 1,
+          "guaranteed": true
+        },
+        "mystery_door": {
+          "count": "0 or 1 (25%)"
+        }
+      },
+
+      "key_economy": {
+        "expected_keys": "0-2 (average 1)",
+        "tension": "Very high - Scarcity meets uncertainty"
+      },
+
+      "barriers": {
+        "wind": 2,
+        "storm": 2,
+        "ice": 1,
+        "fire": 1,
+        "total": 6
+      },
+
+      "consumable_availability": {
+        "match_drop_rate": 0.05,
+        "rope_drop_rate": 0.06,
+        "blowtorch_drop_rate": 0.05,
+        "breaker_bar_drop_rate": 0.03
+      },
+
+      "design_intent": "Hard. Risk/reward decisions critical. Most combinations available.",
+      
+      "unlocks_after_boss": ["Mycology", "Entomology", "Genetics", "Immunology", "Seismology", "Meteorology"]
+    },
+
+    {
+      "floor": 5,
+      "biome": "biosphere",
+      "biome_name": "The Origin",
+      "difficulty_tier": 5,
+      "theme": "Life's origin, primordial forces, ultimate knowledge",
+      
+      "guaranteed_rooms": {
+        "normal_rooms": 8,
+        "secret_rooms": 1,
+        "shop_room": 1,
+        "boss_room": 1,
+        "marked_unlocked_door": 1,
+        "total_guaranteed": 12
+      },
+
+      "procedural_room": {
+        "count": 1,
+        "type": "shop_or_mystery_door"
+      },
+
+      "total_rooms": 13,
+
+      "locked_doors": {
+        "shop_locked_door": {
+          "count": 1,
+          "guaranteed": true
+        },
+        "mystery_door": {
+          "count": "0 or 1 (25%)"
+        }
+      },
+
+      "key_economy": {
+        "expected_keys": "0-2 (average 1)",
+        "tension": "Extreme - Every choice matters"
+      },
+
+      "barriers": {
+        "cosmic": 2,
+        "primordial": 2,
+        "mixed": 2,
+        "total": 6
+      },
+
+      "final_boss": {
+        "name": "The Primordial Entity",
+        "description": "Ultimate boss fight",
+        "health": "Significant (scaled to player power)",
+        "difficulty": "Extreme"
+      },
+
+      "consumable_availability": {
+        "match_drop_rate": 0.06,
+        "rope_drop_rate": 0.08,
+        "blowtorch_drop_rate": 0.06,
+        "breaker_bar_drop_rate": 0.04
+      },
+
+      "design_intent": "Extreme gauntlet. Final test of mastery. All specializations now available.",
+      
+      "unlocks_after_boss": ["Oceanography", "Toxicology", "Archaeology", "Quantum Physics", "Cosmology", "Mineralogy", "Virology", "Exobiology", "Climatology", "Astronomy", "Wildlife"]
+    }
+  ],
+
+  "floor_summary": {
+    "structure": "All 5 floors identical room count (13), varying difficulty",
+    "room_distribution": "8 normal + 1 secret + 1 shop + 1 boss + 1 marked door + 1 procedural (shop or mystery)",
+    "progression": "Each floor unlocks new specializations after boss",
+    "difficulty_curve": "Steady increase from easy to extreme",
+    "key_tension": "1-2 keys per floor, must choose which locked doors to open",
+    "discovery_pacing": "New specializations unlock as you progress, enabling new combos"
+  }
+}

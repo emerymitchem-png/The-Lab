@@ -1,0 +1,436 @@
+{
+  "game_loop": {
+    "philosophy": "Single run = 13 rooms per floor × 5 floors = 65 rooms maximum. Death = game over. Meta-progression through discoveries.",
+    
+    "run_structure": {
+      "total_rooms_per_run": 65,
+      "formula": "13 rooms/floor × 5 floors",
+      "death_condition": "Reach 0 brains (health) = game over",
+      "victory_condition": "Defeat The Infinitum boss on Floor 5"
+    },
+
+    "single_run_loop": {
+      "phase_1_entry": {
+        "name": "Run Start",
+        "action": "Player enters The Lab (Floor 1)",
+        "starting_state": {
+          "health": "5 brains",
+          "damage": "1.0",
+          "speed": "1.0",
+          "specialization": "Student (default)",
+          "weapon_artifacts": "0/2 slots",
+          "consumable_artifacts": "None"
+        }
+      },
+
+      "phase_2_exploration": {
+        "name": "Room Exploration",
+        "repeats": "Once per room",
+        "room_types": [
+          "Normal Combat Room (enemies)",
+          "Secret Room (rare loot)",
+          "Shop Room (vending machine)",
+          "Boss Room (end-of-floor boss)",
+          "Marked Door (unlocked, rare chest)",
+          "Locked Door (shop or mystery - requires key)"
+        ],
+        "actions_in_room": [
+          "Combat (kill enemies to progress)",
+          "Navigate (use permanent tools: Match, Rope, Blowtorch, Breaker Bar)",
+          "Collect (loot: coins, items, specialization books, artifacts)",
+          "Shop (vending machine - buy items with coins)",
+          "Choose (if multiple items, pick what to take)"
+        ]
+      },
+
+      "phase_3_combat": {
+        "name": "Twin-Stick Combat",
+        "mechanics": [
+          "Move with left stick (avoid enemies/hazards)",
+          "Shoot with right stick (attack enemies)",
+          "Collect drops (automatic pickup or manual proximity)",
+          "Dodge/kite (positioning-based skill)",
+          "Manage resources (coins, health, ammunition/cooldowns)"
+        ],
+        "combat_rewards": {
+          "enemy_kill": {
+            "coins": "1-2 per normal enemy",
+            "specialization_book": "5-10% drop rate",
+            "artifact": "Rare (~1% per enemy)",
+            "consumable_artifact": "15% drop rate (Burrito, Energy Drink, etc.)"
+          }
+        }
+      },
+
+      "phase_4_progression": {
+        "name": "Room Clear → Next Room",
+        "flow": [
+          "Kill all enemies in room",
+          "Collect all loot",
+          "Door to next room unlocks",
+          "Enter next room or backtrack (shop, secret, boss)"
+        ]
+      },
+
+      "phase_5_floor_boss": {
+        "name": "Boss Encounter",
+        "trigger": "Reach boss room (guaranteed)",
+        "boss_fight": {
+          "unique_patterns": "Each boss has specific attack patterns",
+          "difficulty": "Scales with player stats (artifacts, health)",
+          "health": "Floor 1: 40 HP → Floor 5: 240 HP (3 phases)"
+        },
+        "victory": "Boss defeated → Floor unlocked",
+        "defeat": "Lose all brains → Game Over (run ends)"
+      },
+
+      "phase_6_floor_transition": {
+        "name": "Descend to Next Floor",
+        "on_victory": "Floor boss defeated",
+        "transition": {
+          "UI": "Narrative message (e.g., 'Tectonic forces push you down...')",
+          "state_transfer": "All stats/items carry over to next floor",
+          "new_enemies": "Floor 2 enemies now spawn",
+          "new_hazards": "Floor 2 hazards now active",
+          "new_shops": "New vending machine with Floor 2 pricing"
+        }
+      },
+
+      "phase_7_meta_progression": {
+        "name": "Between Rooms",
+        "when": "After each room clear",
+        "permanent_effects": {
+          "specialization_book_collected": "Added to codex permanently. Unlocks new combo.",
+          "artifact_discovered": "Added to loot pool for all future runs.",
+          "boss_defeated": "Unlocks next floor for future runs."
+        }
+      },
+
+      "phase_8_endgame": {
+        "name": "Final Boss / Victory",
+        "trigger": "Reach Floor 5 boss (The Infinitum)",
+        "challenge": {
+          "health": "240 HP across 3 phases",
+          "patterns": "Uses attacks from all previous bosses + adapts",
+          "difficulty": "Extreme - requires mastery of all floor mechanics"
+        },
+        "victory": {
+          "ending": "Narrative: 'You understand. You return to the Lab, but changed.'",
+          "stats_recorded": "Run completion time, total brains used, coins collected",
+          "meta_reward": "All discovered items/specs permanently unlocked"
+        },
+        "defeat": "Game Over. Return to main menu."
+      }
+    },
+
+    "meta_progression": {
+      "philosophy": "Discovery system. What you find once, unlocks forever.",
+      
+      "discovery_types": [
+        {
+          "type": "Specialization Book",
+          "discovery": "Find a 'Biology' book during a run",
+          "unlock": "Biology is now available from start of ALL future runs",
+          "effect": "Can start as Biologist if desired, or combine with other specs",
+          "progression": "Collect all 34 specializations over multiple runs"
+        },
+        {
+          "type": "Weapon Artifact",
+          "discovery": "Find 'Battery' during a run",
+          "unlock": "Battery now appears in loot pools for all future runs",
+          "effect": "Can equip Battery in any future run",
+          "progression": "Collect all 5 base artifacts + 5+ combination artifacts"
+        },
+        {
+          "type": "Artifact Combination",
+          "discovery": "Equip Battery + Microscope together → creates Electron Microscope",
+          "unlock": "Electron Microscope now available as base drop for all future runs",
+          "effect": "Players who discover combo get it earlier than others",
+          "progression": "Unlock 50+ combinations across runs"
+        },
+        {
+          "type": "Boss Victory",
+          "discovery": "Defeat Entropy boss on Floor 1",
+          "unlock": "Floor 2 is now accessible in all future runs",
+          "effect": "Can proceed deeper, discover more",
+          "progression": "Unlock all 5 bosses, reach The Infinitum"
+        }
+      ],
+
+      "codex_system": {
+        "what_it_tracks": [
+          "All specializations discovered (with unlock conditions)",
+          "All weapon artifacts discovered",
+          "All artifact combinations discovered",
+          "All bosses defeated",
+          "Best run stats (fastest time, most brains remaining, most coins)"
+        ],
+        "visual": "Menu showing all discoveries with 'locked' vs 'unlocked' status",
+        "incentive": "Completionists want to find all 34 specs + all artifact combos"
+      },
+
+      "knowledge_reward": {
+        "philosophy": "Player knowledge is power",
+        "example": {
+          "first_run": "Random artifacts, random specializations. 'What does Battery do?'",
+          "tenth_run": "Player knows Battery = damage. Seeks out Battery + Microscope combo.",
+          "thirtieth_run": "Player has discovered 20 artifact combos. Builds intentionally broken runs."
+        }
+      }
+    },
+
+    "run_difficulty_scaling": {
+      "player_power_progression": {
+        "start_of_run": "1.0 damage, 1.0 speed, 5 health",
+        "mid_run": "1.3 damage (artifacts), 1.15 speed, 7 health (specializations + consumables)",
+        "late_run": "1.5+ damage, 1.3 speed, 10+ health (full optimization)"
+      },
+
+      "enemy_difficulty": {
+        "philosophy": "Enemies scale with floor, not player power",
+        "floor_1": "Weak enemies, learnable patterns",
+        "floor_5": "Extreme enemies, requires mastery + good artifacts",
+        "scaling": "Difficulty is FLOOR-based, not player-based"
+      },
+
+      "difficulty_variance": {
+        "lucky_run": "Find 3 early artifacts, 2 specialization books → trivialize Floor 3",
+        "unlucky_run": "Find no artifacts, no books → struggle even on Floor 1",
+        "skill_matters": "Good player can beat Floors 1-2 with no artifacts. Bad player struggles with any floor."
+      }
+    },
+
+    "loot_economy": {
+      "drop_rates_per_enemy": {
+        "specialization_book": "5-10% per normal enemy (increasing per floor)",
+        "weapon_artifact": "Very rare (~1% per enemy) unless you have 3+ collected",
+        "consumable_artifact": "15% per enemy (Burrito, Energy Drink, etc.)",
+        "coins": "1-2 per normal enemy"
+      },
+
+      "environmental_breaks": {
+        "match_use": "Reveals coins/items hidden in cracked walls",
+        "rope_use": "Allows access to high/low areas",
+        "blowtorch_use": "Breaks ice/sealed doors",
+        "breaker_bar_use": "Breaks thick barriers"
+      },
+
+      "chest_contents": {
+        "normal_chest": "10-20 coins, maybe item",
+        "rare_chest": "30-50 coins, guaranteed item (artifact or book)",
+        "secret_room_chest": "50-100 coins, rare artifact or rare book"
+      }
+    },
+
+    "key_decision_points": {
+      "decision_1_shop_priority": {
+        "scenario": "At vending machine with 60 coins. Choose 1 of 3 items:",
+        "option_a": "Buy artifact (100 coins) - can't afford, skip",
+        "option_b": "Buy Blowtorch (60 coins) - access secret areas",
+        "option_c": "Buy Healing (40 coins) - save for next shop"
+      },
+
+      "decision_2_locked_door": {
+        "scenario": "Found 1 key. 2 locked doors ahead: shop or mystery?",
+        "option_a": "Open shop - safe, guaranteed good loot",
+        "option_b": "Open mystery - risky, but maybe rare artifact",
+        "option_c": "Save key - might find another, or skip both"
+      },
+
+      "decision_3_artifact_swap": {
+        "scenario": "Have Battery (1.2 damage). Find Microscope (1.25 speed) + Lens (1.15 damage).",
+        "option_a": "Keep Battery, equip Microscope (fast, still powerful)",
+        "option_b": "Swap Battery for Lens (more focused damage)",
+        "option_c": "Equip both (1/2 is Microscope, 1/2 is Lens - hybrid build)"
+      },
+
+      "decision_4_health_management": {
+        "scenario": "Have 3 brains left. Healing costs 40 coins. Enemy drops Burrito (+2 health).",
+        "option_a": "Use Burrito immediately - guaranteed health",
+        "option_b": "Save Burrito for later? (risky if you die)",
+        "option_c": "Spend coins on healing at shop - save Burrito"
+      }
+    },
+
+    "run_variance": {
+      "what_changes_each_run": [
+        "Enemy spawn locations (procedural room generation)",
+        "Loot drops (randomized but seeded)",
+        "Specialization book appearances (random floors)",
+        "Artifact discoveries (RNG when they drop)",
+        "Boss AI patterns (adaptive, learns your moves)",
+        "Locked door content (shop vs mystery, random per run)"
+      ],
+
+      "what_stays_consistent": [
+        "Floor layouts (13 rooms each floor)",
+        "Floor progression (always 1→2→3→4→5)",
+        "Boss health pools (same per floor across runs)",
+        "Artifact stat values (Battery always 1.2 damage)",
+        "Specialization effects (Biology always has same debuff)"
+      ],
+
+      "replayability": {
+        "reason_1": "Different loot = different build = different playstyle",
+        "reason_2": "New discoveries unlock new synergies",
+        "reason_3": "Boss learning = must adapt strategy",
+        "reason_4": "Player skill matters = same run can go very differently"
+      }
+    },
+
+    "progression_loops": {
+      "loop_1_single_run": {
+        "duration": "30-90 minutes per run (depending on skill + luck)",
+        "goal": "Reach Floor 5 boss or die trying",
+        "reward": "Discoveries (unlocks for future runs)"
+      },
+
+      "loop_2_meta_progression": {
+        "duration": "5-50 runs to unlock everything",
+        "goal": "Discover all 34 specializations + 20+ artifact combos",
+        "reward": "Full codex. Knowledge. Ability to build crazy combos."
+      },
+
+      "loop_3_mastery": {
+        "duration": "Unlimited (speedruns, challenge runs, self-imposed rules)",
+        "goal": "Beat game with specific builds, fast times, etc.",
+        "reward": "Personal satisfaction. Leaderboards (future)."
+      }
+    },
+
+    "run_failure_states": {
+      "game_over_condition": "Reach 0 brains (health)",
+      "recovery_mechanics": "None in MVP - death is permanent per run",
+      "upon_death": {
+        "stats_saved": "Run duration, floors cleared, items collected",
+        "return_to": "Main menu",
+        "next_run": "New run with same baseline stats (discovered items still unlocked)",
+        "emotional_impact": "Defeat stings, motivates next run"
+      },
+
+      "post_launch_features": "Resurrection items, continue mechanics could be added later"
+    },
+
+    "time_to_completion": {
+      "first_run": "45-90 minutes (learning, exploring, dying)",
+      "experienced_run": "30-45 minutes (know patterns, efficient routing)",
+      "speedrun_potential": "15-20 minutes (with mastery + good RNG)",
+      "100_percent": "50-100 hours (unlock all specs, combos, beat all bosses multiple times)"
+    },
+
+    "session_structure": {
+      "short_session": "1-2 runs (45-90 minutes total)",
+      "medium_session": "3-5 runs (2-4 hours total)",
+      "long_session": "Unlimited runs, grinding for specific discoveries",
+      "ideal_for": "Lunch break (1 run), evening chill (3 runs), weekend binge (many runs)"
+    },
+
+    "win_conditions": {
+      "immediate_win": "Defeat The Infinitum, reach end credits",
+      "meta_win": "Discover all 34 specializations",
+      "full_win": "Unlock all artifact combinations (20+)",
+      "ultimate_win": "Complete codex + beat all bosses + speedrun times"
+    },
+
+    "next_run_loop": {
+      "between_runs": {
+        "main_menu": "See codex (all discoveries), start new run",
+        "choices_available": [
+          "Start default run (randomized)",
+          "Select specific starting specialization (if discovered)",
+          "View run statistics (best times, furthest floors)",
+          "View codex (all unlocked items)"
+        ]
+      },
+
+      "new_run_begins": {
+        "state_reset": "Health back to 5, speed/damage back to 1.0",
+        "state_carries": "All discovered specializations/artifacts still in loot pools",
+        "philosophy": "Each run is a fresh start, but knowledge persists"
+      }
+    }
+  },
+
+  "progression_milestones": {
+    "milestone_1_first_boss": {
+      "trigger": "Defeat Entropy boss (Floor 1)",
+      "reward": "Floor 2 unlocked permanently",
+      "discovery": "Player learns boss patterns exist",
+      "incentive": "New floor = new enemies, new loot"
+    },
+
+    "milestone_2_first_combo": {
+      "trigger": "Discover Battery + Microscope = Electron Microscope",
+      "reward": "Electron Microscope added to loot pool",
+      "discovery": "Player learns artifacts can combine",
+      "incentive": "Combos are more powerful, unlock more combos"
+    },
+
+    "milestone_3_first_specialization": {
+      "trigger": "Collect any specialization book (Biology, Chemistry, etc.)",
+      "reward": "+1 max health, specialization now available",
+      "discovery": "Player learns specs unlock new projectiles",
+      "incentive": "Different specs = different playstyles"
+    },
+
+    "milestone_4_broken_build": {
+      "trigger": "Find artifact + specialization combo that trivializes a floor",
+      "reward": "Player experiences 'broken' run feeling",
+      "discovery": "Synergies exist, some are overpowered",
+      "incentive": "Want to find more broken combos"
+    },
+
+    "milestone_5_full_codex": {
+      "trigger": "Unlock all 34 specializations + all artifact combinations",
+      "reward": "Complete knowledge, can build anything",
+      "discovery": "Full picture of what's possible",
+      "incentive": "Leaderboard, speedruns, challenge runs"
+    }
+  },
+
+  "session_examples": {
+    "example_1_lucky_first_run": {
+      "duration": "35 minutes",
+      "path": "Floor 1 → Floor 2 → Floor 3 (boss, die)",
+      "loot": [
+        "Battery artifact (Floor 1)",
+        "Microscope artifact (Floor 2)",
+        "Biology book (Floor 2)",
+        "Chemistry book (Floor 3)",
+        "3 Burritos (various)"
+      ],
+      "final_stats": "1.35 damage, 1.25 speed, 9 brains",
+      "discoveries": ["Battery", "Microscope", "Electron Microscope", "Biology", "Chemistry", "Biochemist"],
+      "next_run_impact": "All these items now in loot pool"
+    },
+
+    "example_2_unlucky_first_run": {
+      "duration": "22 minutes",
+      "path": "Floor 1 → death at room 8",
+      "loot": [
+        "2 Burritos",
+        "No artifacts found",
+        "No books found"
+      ],
+      "final_stats": "1.0 damage, 1.0 speed, 1 brain",
+      "discoveries": "None",
+      "cause_of_death": "Rushed, didn't understand combat patterns",
+      "next_run_impact": "Player learned: go slow, learn patterns, kite"
+    },
+
+    "example_3_mastery_run": {
+      "duration": "18 minutes",
+      "path": "Floor 1 → 2 → 3 → 4 → 5 (victory!)",
+      "loot": [
+        "Battery + Microscope + Electron Microscope (by Floor 2)",
+        "Physics book (early, intentional)",
+        "5 specialization books total",
+        "Quantum Microscope (legendary artifact)"
+      ],
+      "final_stats": "1.5 damage, 1.4 speed, 12 brains",
+      "discoveries": "10+ combinations, rare artifacts",
+      "strategy": "Knew where to find artifacts, built intentional combos",
+      "victory": "Beat The Infinitum, new personal best time"
+    }
+  }
+}

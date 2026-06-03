@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Lab - Roguelike Roguelike</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui-container">
+            <div id="hud">
+                <div id="health-display">
+                    <span class="label">Brains:</span>
+                    <div id="brain-counter"></div>
+                </div>
+                <div id="floor-display">
+                    <span class="label">Floor:</span>
+                    <span id="floor-number">1</span>
+                </div>
+                <div id="room-display">
+                    <span class="label">Room:</span>
+                    <span id="room-number">1/13</span>
+                </div>
+                <div id="coins-display">
+                    <span class="label">Coins:</span>
+                    <span id="coin-count">0</span>
+                </div>
+            </div>
+            <div id="inventory-display">
+                <span class="label">Equipment:</span>
+                <div id="weapon-slots">
+                    <div class="weapon-slot" id="slot-1">Empty</div>
+                    <div class="weapon-slot" id="slot-2">Empty</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu Overlay -->
+    <div id="menu-overlay" class="overlay">
+        <div class="menu-panel">
+            <h1>THE LAB</h1>
+            <p>A descent into discovery</p>
+            <button id="start-button" class="menu-button">START RUN</button>
+            <button id="codex-button" class="menu-button">CODEX</button>
+            <button id="settings-button" class="menu-button">SETTINGS</button>
+        </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pause-overlay" class="overlay hidden">
+        <div class="menu-panel">
+            <h2>PAUSED</h2>
+            <button id="resume-button" class="menu-button">RESUME</button>
+            <button id="codex-pause-button" class="menu-button">CODEX</button>
+            <button id="quit-button" class="menu-button">QUIT TO MENU</button>
+        </div>
+    </div>
+
+    <!-- Codex -->
+    <div id="codex-overlay" class="overlay hidden">
+        <div class="codex-panel">
+            <h2>CODEX</h2>
+            <div id="codex-content">
+                <div class="codex-section">
+                    <h3>Specializations</h3>
+                    <div id="codex-specs"></div>
+                </div>
+                <div class="codex-section">
+                    <h3>Artifacts</h3>
+                    <div id="codex-artifacts"></div>
+                </div>
+            </div>
+            <button id="close-codex-button" class="menu-button">CLOSE</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameover-overlay" class="overlay hidden">
+        <div class="menu-panel">
+            <h2 id="gameover-title">GAME OVER</h2>
+            <div id="gameover-stats">
+                <p id="gameover-floors">Floors Reached: 1</p>
+                <p id="gameover-rooms">Rooms Cleared: 0</p>
+                <p id="gameover-time">Time: 0:00</p>
+            </div>
+            <button id="retry-button" class="menu-button">TRY AGAIN</button>
+            <button id="menu-button" class="menu-button">MAIN MENU</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/loader.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/enemy.js"></script>
+    <script src="js/room.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>

@@ -1,0 +1,194 @@
+{
+  "stats_system": {
+    "description": "Simple stat system. Base stats modified by specializations, artifacts, and consumables.",
+    
+    "base_stats": {
+      "student_default": {
+        "damage": 1.0,
+        "speed": 1.0,
+        "health": 5,
+        "health_icon": "🧠",
+        "health_mechanic": "Brain counter. Each brain = 1 HP. Die at 0 brains."
+      }
+    },
+
+    "specialization_stat_effects": {
+      "philosophy": "Specializations change projectile type and debuff, NOT base stats",
+      "damage": "No specialization base damage bonus - damage scaling comes from artifacts",
+      "speed": "No specialization base speed bonus - speed comes from artifacts",
+      "health": "No specialization health bonus - health comes from consumables and books",
+      "note": "Specializations are purely about HOW you attack (projectile + debuff), not raw stats"
+    },
+
+    "artifact_stat_effects": {
+      "weapon_artifacts": {
+        "philosophy": "Modify damage, speed, and shooting patterns",
+        "mechanics": "Multiplicative stacking",
+        "example": {
+          "base_damage": 1.0,
+          "battery_equipped": "1.0 × 1.2 = 1.2 damage",
+          "microscope_equipped": "base × 1.25 = 1.25× speed multiplier",
+          "both_equipped": "1.2 damage × 1.25 speed"
+        },
+        "shooting_patterns": [
+          {
+            "pattern": "rapid_fire",
+            "effect": "Increased attack speed",
+            "example_artifact": "Microscope gives +25% fire rate"
+          },
+          {
+            "pattern": "spread_shot",
+            "effect": "Multiple projectiles in cone",
+            "example_artifact": "Prism creates split projectiles"
+          },
+          {
+            "pattern": "charge_shot",
+            "effect": "Hold button to build power",
+            "example_artifact": "Battery enables charging"
+          },
+          {
+            "pattern": "burst",
+            "effect": "Fire 3+ shots rapidly",
+            "example_artifact": "Electron Microscope fires bursts"
+          },
+          {
+            "pattern": "piercing",
+            "effect": "Projectiles pass through enemies",
+            "example_artifact": "Lens creates focused piercing beam"
+          },
+          {
+            "pattern": "bouncing",
+            "effect": "Projectiles ricochet off walls",
+            "example_artifact": "Light Source creates bouncing light"
+          }
+        ]
+      },
+
+      "consumable_artifacts": {
+        "philosophy": "Flat bonuses to health and speed",
+        "stacking": "Multiple of same type stack",
+        "burrito": {
+          "effect": "+1 health (brain)",
+          "stacking": "2 Burritos = +2 health total",
+          "consumed": true
+        },
+        "energy_drink": {
+          "effect": "+0.1 speed multiplier",
+          "stacking": "2 Energy Drinks = +0.2 speed multiplier",
+          "consumed": true
+        }
+      }
+    },
+
+    "health_system": {
+      "health_representation": "Brains (🧠)",
+      "base_health": 5,
+      "display": "5 brain icons = 5 HP",
+      "damage": "Each hit = -1 brain (simple)",
+      "death": "Reach 0 brains = death",
+      
+      "gaining_health": {
+        "method_1": "Find consumable Burrito artifact",
+        "method_2": "Unlock specialization with book",
+        "specialization_health": "Each new specialization discovered = +1 max health",
+        "example": {
+          "start": "5 brains (student)",
+          "find_biology_book": "6 brains (Biologist)",
+          "find_chemistry_book": "7 brains (can combine to Biochemist)",
+          "find_burrito": "8 brains total"
+        }
+      }
+    },
+
+    "artifact_combination_stat_bonuses": {
+      "philosophy": "Combinations get enhanced stats compared to base artifacts",
+      "example_1": {
+        "base_battery": {
+          "damage": 1.2,
+          "speed": 1.0,
+          "pattern": null
+        },
+        "base_microscope": {
+          "damage": 1.0,
+          "speed": 1.25,
+          "pattern": "rapid_fire"
+        },
+        "combined_electron_microscope": {
+          "damage": 1.35,
+          "speed": 1.25,
+          "pattern": "rapid_fire + burst",
+          "bonus": "Smaller bullets, way faster, burst fire"
+        }
+      },
+      "example_2": {
+        "base_lens": {
+          "damage": 1.15,
+          "speed": 1.1,
+          "pattern": "focused_beam"
+        },
+        "base_prism": {
+          "damage": 1.0,
+          "speed": 1.0,
+          "pattern": "spread_shot"
+        },
+        "combined_spectroscope": {
+          "damage": 1.2,
+          "speed": 1.15,
+          "pattern": "spread_shot + piercing",
+          "bonus": "Multiple projectiles that pierce through enemies"
+        }
+      }
+    },
+
+    "stat_calculation_order": {
+      "step_1": "Base stats (1.0 damage, 1.0 speed)",
+      "step_2": "Apply weapon artifact slot 1",
+      "step_3": "Apply weapon artifact slot 2 (multiplicative)",
+      "step_4": "Apply consumable artifact bonuses (additive for speed)",
+      "step_5": "Final: damage × speed × any special modifiers",
+      "example": {
+        "start": "1.0 damage, 1.0 speed",
+        "battery_slot_1": "1.0 × 1.2 = 1.2 damage",
+        "microscope_slot_2": "1.2 damage × 1.25 speed = 1.5 dps",
+        "consumed_energy_drink": "1.5 × (1.0 + 0.1) = 1.65 final dps",
+        "pattern": "Rapid fire burst, small bullets"
+      }
+    },
+
+    "gameplay_progression": {
+      "early_game": {
+        "stats": "1.0 damage, 1.0 speed, 5 health",
+        "projectile": "Specialization default (Cell, Atom, etc.)",
+        "pattern": "Single shots"
+      },
+      "mid_game": {
+        "stats": "1.2 damage (Battery), 1.25 speed (Microscope), 7 health (found 2 specs + burrito)",
+        "projectile": "Electron Microscope visuals",
+        "pattern": "Rapid fire bursts, smaller bullets"
+      },
+      "late_game": {
+        "stats": "1.5+ damage, 1.3+ speed, 10+ health",
+        "projectile": "Ultra-rare combinations (Quantum Microscope, etc.)",
+        "pattern": "Piercing spreads, bouncing charges, complex combos"
+      }
+    },
+
+    "specialization_health_unlocks": {
+      "philosophy": "Finding a new specialization book grants +1 max health",
+      "purpose": "Encourages variety, rewards exploration",
+      "mechanics": {
+        "find_first_book": "Gain specialization + 1 health",
+        "find_same_book_again": "No additional health (only first discovery counts)",
+        "combining_specs": "No extra health (just the initial discoveries)"
+      },
+      "example_progression": {
+        "student": "5 health",
+        "biology_book": "6 health (Biologist unlocked)",
+        "chemistry_book": "7 health (Biochemist now available)",
+        "physics_book": "8 health (Biophysicist now available)",
+        "microbiology_book": "9 health (Paleomicrobiologist now available)",
+        "burrito_consumed": "10 health (consumable stacks)"
+      }
+    }
+  }
+}

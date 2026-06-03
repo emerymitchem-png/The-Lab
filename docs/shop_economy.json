@@ -1,0 +1,225 @@
+{
+  "shop_economy": {
+    "currency": {
+      "name": "Coins",
+      "philosophy": "Resource management like Binding of Isaac. Find coins, make tough choices about what to buy.",
+      "visual": "💰"
+    },
+
+    "coin_acquisition": {
+      "enemies": {
+        "normal_enemy": {
+          "coins_dropped": "1-2",
+          "average": 1.5,
+          "per_room_avg": "3-6 coins (2-4 normal enemies)"
+        },
+        "elite_enemy": {
+          "coins_dropped": "3-5",
+          "average": 4
+        },
+        "boss": {
+          "coins_dropped": "10-15",
+          "average": 12
+        }
+      },
+      "environmental_breaks": {
+        "blowtorch_use": "5-10 coins",
+        "breaker_bar_use": "5-10 coins",
+        "rope_use": "0 coins (utility, not reward)",
+        "match_use": "0 coins (utility, not reward)"
+      },
+      "chests": {
+        "normal_chest": "10-20 coins",
+        "rare_chest": "30-50 coins",
+        "secret_room_chest": "50-100 coins"
+      },
+      "average_per_room": {
+        "normal_room": "10-15 coins",
+        "rare_room": "20-30 coins",
+        "secret_room": "50-80 coins"
+      }
+    },
+
+    "room_structure": {
+      "vending_machine_room": {
+        "description": "Every floor has 1 vending machine room",
+        "layout": "Room with vending machine",
+        "selection": "Player chooses 1 of 3 random items to buy",
+        "mechanics": {
+          "one_purchase": "Can only buy one item per vending machine visit",
+          "multiple_machines": "Can't revisit same machine, but different rooms might have machines",
+          "refresh": "Items don't refresh - it's 1 choice per floor's machine"
+        }
+      }
+    },
+
+    "vending_machine_inventory": {
+      "pool_consumables": [
+        "Match (1-3 charges)",
+        "Rope (1-3 charges)",
+        "Blowtorch (1-3 charges)",
+        "Breaker Bar (1-2 charges)",
+        "Healing (restore 1 brain)"
+      ],
+      "pool_utility": [
+        "Universal Key"
+      ],
+      "pool_artifacts": [
+        "Any base artifact (Battery, Microscope, Lens, Prism, Light Source)",
+        "Any discovered combo artifact (Electron Microscope, etc.)"
+      ]
+    },
+
+    "prices_by_floor": {
+      "floor_1": {
+        "consumables": {
+          "match_3_charges": 25,
+          "rope_3_charges": 30,
+          "blowtorch_3_charges": 50,
+          "breaker_bar_2_charges": 40
+        },
+        "utility": {
+          "universal_key": 60
+        },
+        "healing": {
+          "restore_1_brain": 35
+        },
+        "artifacts": {
+          "base_artifact_common": 100,
+          "base_artifact_rare": 120,
+          "combo_artifact": 150
+        }
+      },
+
+      "floor_2": {
+        "consumables": {
+          "match_3_charges": 30,
+          "rope_3_charges": 35,
+          "blowtorch_3_charges": 60,
+          "breaker_bar_2_charges": 50
+        },
+        "utility": {
+          "universal_key": 75
+        },
+        "healing": {
+          "restore_1_brain": 40
+        },
+        "artifacts": {
+          "base_artifact_common": 120,
+          "base_artifact_rare": 140,
+          "combo_artifact": 180
+        }
+      },
+
+      "floor_3": {
+        "consumables": {
+          "match_3_charges": 35,
+          "rope_3_charges": 40,
+          "blowtorch_3_charges": 70,
+          "breaker_bar_2_charges": 60
+        },
+        "utility": {
+          "universal_key": 90
+        },
+        "healing": {
+          "restore_1_brain": 45
+        },
+        "artifacts": {
+          "base_artifact_common": 140,
+          "base_artifact_rare": 160,
+          "combo_artifact": 210
+        }
+      },
+
+      "floor_4": {
+        "consumables": {
+          "match_3_charges": 40,
+          "rope_3_charges": 45,
+          "blowtorch_3_charges": 80,
+          "breaker_bar_2_charges": 70
+        },
+        "utility": {
+          "universal_key": 105
+        },
+        "healing": {
+          "restore_1_brain": 50
+        },
+        "artifacts": {
+          "base_artifact_common": 160,
+          "base_artifact_rare": 180,
+          "combo_artifact": 240
+        }
+      },
+
+      "floor_5": {
+        "consumables": {
+          "match_3_charges": 45,
+          "rope_3_charges": 50,
+          "blowtorch_3_charges": 90,
+          "breaker_bar_2_charges": 80
+        },
+        "utility": {
+          "universal_key": 120
+        },
+        "healing": {
+          "restore_1_brain": 60
+        },
+        "artifacts": {
+          "base_artifact_common": 180,
+          "base_artifact_rare": 200,
+          "combo_artifact": 270
+        }
+      }
+    },
+
+    "economy_balance": {
+      "philosophy": "Artifacts are expensive. Require 2-3 floors of saving OR lucky environmental breaks.",
+      "math": {
+        "floor_1_average_room_coins": "10-15 coins",
+        "artifact_cost_floor_1": 100,
+        "rooms_needed": "7-10 rooms to afford 1 artifact",
+        "with_luck": "Secret room (50-80 coins) + 2 normal rooms = artifact affordable"
+      },
+      "tuning": {
+        "note": "All values are starting estimates. Easy to adjust if economy feels too tight/loose.",
+        "scaling": "Prices scale per floor, coin drops scale with difficulty",
+        "no_softlock": "Designed so players can't get stuck (always path to victory)"
+      }
+    },
+
+    "player_decision_trees": {
+      "scenario_1_early_run": {
+        "situation": "Floor 1, found 30 coins, at vending machine",
+        "choice_a": "Buy Healing (35 coins) - risky, no buffer",
+        "choice_b": "Buy Match (25 coins) - utility, save for next floor",
+        "choice_c": "Buy Key (60 coins) - can't afford, skip this machine"
+      },
+      "scenario_2_mid_run": {
+        "situation": "Floor 2, found 80 coins total, 60 remaining after spending",
+        "choice_a": "Buy Artifact (120 coins) - not enough, skip",
+        "choice_b": "Buy Blowtorch (60 coins) - saves money for next floor",
+        "choice_c": "Buy Healing + Match (70 coins) - get multiple tools"
+      },
+      "scenario_3_late_run": {
+        "situation": "Floor 4, found 250 coins, at vending machine with artifact available",
+        "choice_a": "Buy Artifact (240 coins) - spend almost everything for power",
+        "choice_b": "Buy Key + Healing (155 coins) - safe, diverse",
+        "choice_c": "Save for Floor 5 - risky, what if need healing?"
+      }
+    },
+
+    "tuning_parameters": {
+      "if_economy_too_tight": [
+        "Increase coins_per_enemy",
+        "Decrease artifact prices",
+        "Increase secret_room_coin_drops"
+      ],
+      "if_economy_too_loose": [
+        "Decrease coins_per_enemy",
+        "Increase artifact prices",
+        "Decrease rare_chest_coins"
+      ],
+      "MVP_testing": "Play through 5 runs, track average coins per floor, adjust as needed"
+    }
+  }
+}

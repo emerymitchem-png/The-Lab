@@ -1,0 +1,159 @@
+{
+  "permanent_tools_system": {
+    "description": "One-time discoveries. Limited uses (50-infinite). Game-changers. Replace consumable slots.",
+    "discovery_mechanic": {
+      "first_find": "Unlocks tool in loot pool permanently",
+      "subsequent_finds": "Can find again in future runs (rare)",
+      "inventory": "Replaces one consumable slot with tool",
+      "uses_display": "Shows remaining uses (e.g., 50/50)",
+      "philosophy": "Limited uses add tension and strategic decisions"
+    },
+
+    "total_tools": 5,
+    "rarity": "Legendary",
+    "drop_rate_first_discovery": 0.05,
+    "drop_rate_after_discovery": 0.08,
+
+    "tools": [
+      {
+        "id": "grappling_hook",
+        "name": "Grappling Hook",
+        "icon": "🪝",
+        "description": "Cross gaps and chasms",
+        "flavor": "No more bottomless pits.",
+        "ability": "Swing/grapple across any gap obstacle",
+        "replaces_slot": "Rope",
+        "max_uses": 50,
+        "mechanics": {
+          "primary_use": "Cross gaps",
+          "secondary_use": "Reach high ledges",
+          "tertiary_use": "Swing over hazardous ground",
+          "per_use_cost": 1
+        },
+        "tension_level": "Moderate",
+        "uses_per_floor": "~10 average",
+        "lasts_entire_run": true,
+        "advantages_over_consumable": [
+          "50 uses vs rope's 1-3 per find",
+          "Faster traverse",
+          "Reliable for entire run"
+        ]
+      },
+      {
+        "id": "fire_extinguisher",
+        "name": "Fire Extinguisher",
+        "icon": "🧯",
+        "description": "Extinguish fire hazards",
+        "flavor": "No more burning obstacles.",
+        "ability": "Safely traverse fire zones, extinguish flames",
+        "replaces_slot": "Match",
+        "max_uses": 40,
+        "mechanics": {
+          "primary_use": "Extinguish fire barriers",
+          "secondary_use": "Douse burning obstacles",
+          "tertiary_use": "Spray area to clear hazards",
+          "per_use_cost": 1
+        },
+        "tension_level": "Moderate",
+        "uses_per_floor": "~8 average",
+        "lasts_entire_run": true,
+        "advantages_over_consumable": [
+          "40 uses vs match's 1-3 per find",
+          "Faster activation",
+          "Reliable for entire run"
+        ]
+      },
+      {
+        "id": "magnifying_glass",
+        "name": "Magnifying Glass",
+        "icon": "🔍",
+        "description": "See secrets forever",
+        "flavor": "Nothing stays hidden.",
+        "ability": "Permanently reveal hidden passages and secrets",
+        "replaces_slot": "Breaker Bar",
+        "max_uses": "INFINITE",
+        "uses_never_deplete": true,
+        "mechanics": {
+          "primary_use": "Reveal hidden paths",
+          "secondary_use": "See through illusions",
+          "tertiary_use": "Highlight secret doors/chests",
+          "per_use_cost": 0
+        },
+        "tension_level": "None - pure advantage",
+        "uses_per_floor": "Unlimited",
+        "lasts_entire_run": "Always",
+        "advantages_over_consumable": [
+          "Infinite uses",
+          "Passive revelation",
+          "Reveals secrets without consuming resources",
+          "Game-changer for exploration"
+        ]
+      },
+      {
+        "id": "drill",
+        "name": "Drill",
+        "icon": "⚙️",
+        "description": "Break soft barriers",
+        "flavor": "Stone crumbles.",
+        "ability": "Bore through rock/mineral barriers effortlessly",
+        "replaces_slot": "Breaker Bar",
+        "max_uses": 50,
+        "mechanics": {
+          "primary_use": "Drill through rock barriers",
+          "secondary_use": "Smash mineral walls",
+          "tertiary_use": "Break sealed containers",
+          "per_use_cost": 1,
+          "speed": "Faster than breaker bar"
+        },
+        "tension_level": "Moderate",
+        "uses_per_floor": "~10 average",
+        "lasts_entire_run": true,
+        "advantages_over_consumable": [
+          "50 uses vs breaker bar's 1-2 per find",
+          "Faster drilling speed",
+          "More powerful strikes"
+        ]
+      },
+      {
+        "id": "plasma_cutter",
+        "name": "Plasma Cutter",
+        "icon": "⚡",
+        "description": "Melt through sealed structures",
+        "flavor": "Nothing is sealed anymore.",
+        "ability": "Cut through ice barriers and sealed doors instantly",
+        "replaces_slot": "Blowtorch",
+        "max_uses": 45,
+        "mechanics": {
+          "primary_use": "Melt ice barriers",
+          "secondary_use": "Cut sealed doors",
+          "tertiary_use": "Burn through tough materials",
+          "per_use_cost": 1,
+          "speed": "Instant or very fast"
+        },
+        "tension_level": "Moderate",
+        "uses_per_floor": "~9 average",
+        "lasts_entire_run": true,
+        "advantages_over_consumable": [
+          "45 uses vs blowtorch's 1-3 per find",
+          "Instant activation",
+          "Can cut through anything"
+        ]
+      }
+    ],
+
+    "player_strategy": {
+      "early_game": "Use tool freely, still have plenty",
+      "mid_game": "\"I'm at 30 uses left, should I use on this?\" - Strategic decisions begin",
+      "late_game": "\"I have 10 uses left for 2 more floors\" - Real tension",
+      "boss_fight": "\"Will X uses be enough?\" - Last-minute decisions",
+      "magnifying_glass_difference": "Never runs out. Pure advantage. Can explore anything. Makes secrets more accessible."
+    },
+
+    "balance_notes": {
+      "philosophy": "Powerful tools with finite lifespan create tension",
+      "uses_calculation": "Enough to feel powerful for entire run, but must be used wisely",
+      "discovery_value": "Finding permanent tool is valuable but not permanent",
+      "magnifying_glass_exception": "Infinite because discovery of secrets shouldn't be limited"
+    }
+  }
+}

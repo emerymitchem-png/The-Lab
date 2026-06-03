@@ -8,12 +8,12 @@
       "theme": "Basic cellular biology, chemistry, physics fundamentals",
       
       "guaranteed_rooms": {
-        "normal_rooms": 8,
+        "normal_rooms": 6,
         "secret_rooms": 1,
         "shop_room": 1,
         "boss_room": 1,
         "marked_unlocked_door": 1,
-        "total_guaranteed": 12
+        "total_guaranteed": 10
       },
 
       "procedural_room": {
@@ -25,7 +25,8 @@
         }
       },
 
-      "total_rooms": 13,
+      "total_rooms": 11,
+      "scaling_note": "Shortest floor. Introduction. Quick learning curve.",
 
       "locked_doors": {
         "shop_locked_door": {
@@ -105,6 +106,7 @@
       },
 
       "total_rooms": 13,
+      "scaling_note": "Standard floor. Mid-game learning phase.",
 
       "locked_doors": {
         "shop_locked_door": {
@@ -150,12 +152,12 @@
       "theme": "Water ecosystems, ice formations, aquatic life",
       
       "guaranteed_rooms": {
-        "normal_rooms": 8,
+        "normal_rooms": 9,
         "secret_rooms": 1,
         "shop_room": 1,
         "boss_room": 1,
         "marked_unlocked_door": 1,
-        "total_guaranteed": 12
+        "total_guaranteed": 13
       },
 
       "procedural_room": {
@@ -163,7 +165,8 @@
         "type": "shop_or_mystery_door"
       },
 
-      "total_rooms": 13,
+      "total_rooms": 14,
+      "scaling_note": "Scaling up. Mid-game tension increases.",
 
       "locked_doors": {
         "shop_locked_door": {
@@ -209,11 +212,11 @@
       
       "guaranteed_rooms": {
         "normal_rooms": 8,
-        "secret_rooms": 1,
+        "secret_rooms": 2,
         "shop_room": 1,
         "boss_room": 1,
         "marked_unlocked_door": 1,
-        "total_guaranteed": 12
+        "total_guaranteed": 13
       },
 
       "procedural_room": {
@@ -221,7 +224,8 @@
         "type": "shop_or_mystery_door"
       },
 
-      "total_rooms": 13,
+      "total_rooms": 14,
+      "scaling_note": "Late game intensity. Double secret rooms unlock treasure paths.",
 
       "locked_doors": {
         "shop_locked_door": {
@@ -253,7 +257,7 @@
         "breaker_bar_drop_rate": 0.03
       },
 
-      "design_intent": "Hard. Risk/reward decisions critical. Most combinations available.",
+      "design_intent": "Hard. Risk/reward decisions critical. Most combinations available. Double secrets reward exploration.",
       
       "unlocks_after_boss": ["Mycology", "Entomology", "Genetics", "Immunology", "Seismology", "Meteorology"]
     },
@@ -266,8 +270,8 @@
       "theme": "Life's origin, primordial forces, ultimate knowledge",
       
       "guaranteed_rooms": {
-        "normal_rooms": 8,
-        "secret_rooms": 1,
+        "normal_rooms": 7,
+        "secret_rooms": 2,
         "shop_room": 1,
         "boss_room": 1,
         "marked_unlocked_door": 1,
@@ -280,6 +284,7 @@
       },
 
       "total_rooms": 13,
+      "scaling_note": "Final floor. Longest but fewer normal rooms (more focused). Double secrets reward final exploration.",
 
       "locked_doors": {
         "shop_locked_door": {
@@ -304,9 +309,9 @@
       },
 
       "final_boss": {
-        "name": "The Primordial Entity",
+        "name": "The Infinitum",
         "description": "Ultimate boss fight",
-        "health": "Significant (scaled to player power)",
+        "health": "240 HP (3 phases)",
         "difficulty": "Extreme"
       },
 
@@ -317,17 +322,25 @@
         "breaker_bar_drop_rate": 0.04
       },
 
-      "design_intent": "Extreme gauntlet. Final test of mastery. All specializations now available.",
+      "design_intent": "Extreme gauntlet. Final test of mastery. Double secrets for final treasure hunt before endgame.",
       
       "unlocks_after_boss": ["Oceanography", "Toxicology", "Archaeology", "Quantum Physics", "Cosmology", "Mineralogy", "Virology", "Exobiology", "Climatology", "Astronomy", "Wildlife"]
     }
   ],
 
   "floor_summary": {
-    "structure": "All 5 floors identical room count (13), varying difficulty",
-    "room_distribution": "8 normal + 1 secret + 1 shop + 1 boss + 1 marked door + 1 procedural (shop or mystery)",
+    "structure": "Scaled room counts: 11 → 13 → 14 → 14 → 13",
+    "total_rooms_per_run": "65 rooms maximum",
+    "room_distribution_scaling": {
+      "floor_1": "6 normal + 1 secret + 1 shop + 1 boss + 1 marked door + 1 procedural = 11 total",
+      "floor_2": "8 normal + 1 secret + 1 shop + 1 boss + 1 marked door + 1 procedural = 13 total",
+      "floor_3": "9 normal + 1 secret + 1 shop + 1 boss + 1 marked door + 1 procedural = 14 total",
+      "floor_4": "8 normal + 2 secrets + 1 shop + 1 boss + 1 marked door + 1 procedural = 14 total (DOUBLE SECRETS)",
+      "floor_5": "7 normal + 2 secrets + 1 shop + 1 boss + 1 marked door + 1 procedural = 13 total (DOUBLE SECRETS)"
+    },
     "progression": "Each floor unlocks new specializations after boss",
     "difficulty_curve": "Steady increase from easy to extreme",
+    "secret_rooms": "Late-game reward. Floors 4-5 have 2 secrets each for better treasure access.",
     "key_tension": "1-2 keys per floor, must choose which locked doors to open",
     "discovery_pacing": "New specializations unlock as you progress, enabling new combos"
   }

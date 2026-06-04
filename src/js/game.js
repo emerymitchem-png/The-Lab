@@ -11,7 +11,7 @@ class Game {
         this.currentFloor = 1;
         this.currentRoom = 1;
         this.currentRoomObject = null;
-        this.totalRoomsPerFloor = 13; // Will be updated based on floor
+        this.totalRoomsPerFloor = 1; // Updated from floor data at room generation
         
         this.gameState = 'menu'; // menu, playing, paused, gameover
         this.isPaused = false;
@@ -65,7 +65,10 @@ class Game {
 
     generateRoom() {
         const floorData = gameLoader.getFloorData(this.currentFloor);
-        this.totalRoomsPerFloor = floorData.total_rooms;
+        const configuredRoomCount = Number(floorData?.total_rooms);
+        if (Number.isFinite(configuredRoomCount) && configuredRoomCount > 0) {
+            this.totalRoomsPerFloor = configuredRoomCount;
+        }
 
         this.currentRoomObject = new Room(
             this.currentFloor,

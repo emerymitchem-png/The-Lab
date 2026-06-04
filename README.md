@@ -5,7 +5,7 @@ A roguelite dungeon crawler where you combine science specializations to fight y
 ## Game Structure
 
 - **5 Floors** (Lab → Geosphere → Hydrosphere → Atmosphere → Biosphere)
-- **13 rooms per floor** (normal rooms, secret rooms, marked doors, shop, boss)
+- **Scaled floor sizes (11→13→14→14→13 rooms)** (normal rooms, secret rooms, marked doors, shop, boss)
 - **34 Science Specializations** (unlock as you progress through floors)
 - **Combination System** (mix specializations for new projectiles and debuffs)
 - **Consumable Tools** (Match, Rope, Blowtorch, Breaker Bar)
@@ -33,4 +33,3 @@ A roguelite dungeon crawler where you combine science specializations to fight y
 - ⏳ Stats system (speed, damage, health)
 - ⏳ Enemy design
 - ⏳ Visual design
-

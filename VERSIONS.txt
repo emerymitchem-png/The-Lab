@@ -1,0 +1,163 @@
+GAME VERSIONS TRACKER
+=====================
+
+Version 1.0.0 (2026-06-04) - Project Started
+- Status: Foundation complete
+- Systems: Specializations, Consumables, Permanent Tools, Floors, Loot, Shop
+- JSON Data: All core config files created
+- Next: Core system implementation
+
+Version 1.0.3 (2026-06-05) - Enemy System
+- Status: Enemy system complete
+- Updated: src/js/enemy.js
+- Features:
+  - Enemy class, data loading, AI states, chasing, attacks, health/damage, death, loot hooks, and boss behavior
+- Files Modified:
+  - src/js/enemy.js
+
+Version 1.0.4 (2026-06-05) - Specialization System
+- Status: Specialization system complete
+- Updated: src/js/specialization.js
+- Features:
+  - Specialization class/system, equip/unequip, stat modifiers, combos, projectile type hooks, unlock/save/load
+- Files Modified:
+  - src/js/specialization.js
+
+Version 1.0.1 (2026-06-05) - Loader System
+- Status: Loader system complete
+- Updated: src/js/loader.js
+- Features:
+  - GameLoader class to load all JSON files from docs/
+  - Flexible data extraction and indexing
+  - Safe getter methods for all systems
+- Files Modified:
+  - src/js/loader.js
+
+Version 1.0.2 (2026-06-05) - Room Generation System
+- Status: Room generation system complete
+- Updated: src/js/room.js
+- Features:
+  - Room generation from floors.json
+  - Identify room types (normal, secret, shop, boss)
+  - Enemy spawning and management
+  - Room state tracking
+- Files Modified:
+  - src/js/room.js
+
+Version 1.0.5 (2026-06-05) - Projectile System
+- Status: Projectile system complete
+- Updated: src/js/projectile.js
+- Features:
+  - Projectile class/system, movement, collision, damage, pierce, bounce, homing, splash, chain, and status effects
+- Files Modified:
+  - src/js/projectile.js
+
+Version 1.0.6 (2026-06-05) - Player Combat Integration
+- Status: Player combat integration complete
+- Updated: src/js/player.js
+- Features:
+  - Player class replacement with movement, health, damage, input, projectile firing, save/load, and specialization integration
+- Files Modified:
+  - src/js/player.js
+
+Version 1.0.7 (2026-06-05) - Artifact System
+- Status: Artifact system complete
+- Updated: src/js/artifact.js
+- Features:
+  - Artifact class/system, inventory, equip/unequip, stat modifiers, triggers, and save/load
+- Files Modified:
+  - src/js/artifact.js
+
+Version 1.0.8 (2026-06-05) - Consumables System
+- Status: Consumables system complete
+- Updated: src/js/consumables.js
+- Features:
+  - Consumable system for match, rope, blowtorch, breaker bar, medkit, battery, smoke bomb, inventory stacks, and room interactions
+- Files Modified:
+  - src/js/consumables.js
+
+Version 1.0.9 (2026-06-05) - Permanent Tools System
+- Status: Permanent tools system complete
+- Updated: src/js/permanent_tools.js
+- Features:
+  - Permanent/legendary tools with charges, durability, cooldowns, repairs, upgrades, recharge events, and save/load
+- Files Modified:
+  - src/js/permanent_tools.js
+
+Version 1.0.10 (2026-06-05) - Loot System
+- Status: Loot system complete
+- Updated: src/js/loot.js
+- Features:
+  - Loot drops, weighted loot tables, physical pickups, gold, XP, artifacts, consumables, permanent tools, keys, room rewards, and enemy rewards
+- Files Modified:
+  - src/js/loot.js
+
+Version 1.0.11 (2026-06-05) - Shop System
+- Status: Shop system complete
+- Updated: src/js/shop.js
+- Features:
+  - Shop inventory, floor-scaled prices, purchases, sold-out items, rerolls, healing, repairs, artifacts, consumables, permanent tools, keys, and save/load
+- Files Modified:
+  - src/js/shop.js
+
+Version 1.0.12 (2026-06-05) - Game Integration Pass
+- Status: Main game loop integration complete
+- Updated: src/js/game.js
+- Features:
+  - Instantiates Player, LootSystem, ShopSystem, and optional player systems when loaded
+  - Passes enemies and walls into Player update so projectile combat can resolve against enemies
+  - Updates room, enemies, loot, shop, HUD, and game state from one loop
+  - Draws room/background, loot, enemies, player/projectiles, shop overlay, UI overlays, and debug text
+  - Hooks enemy deaths, room clears, shop rooms, permanent tool recharge events, artifact triggers, and save/load integration
+- Files Modified:
+  - src/js/game.js
+
+Version 1.0.13 (2026-06-05) - Script Load Order Integration
+- Status: Script load order integration complete
+- Updated: src/index.html
+- Features:
+  - Updates the script tag section so all completed systems load before game.js
+  - Keeps loader.js first and game.js last
+  - Uses paths relative to src/index.html: js/loader.js through js/game.js
+- Files Modified:
+  - src/index.html
+
+Version 1.0.14 (2026-06-05) - Browser Smoke-Test Compatibility Pass
+- Status: Compatibility pass complete
+- Updated: src/js/game.js
+- Features:
+  - Adds safe constructor calls for Player, Room, LootSystem, ShopSystem, ArtifactSystem, ConsumableSystem, and PermanentToolSystem
+  - Adds flexible method calls for update, draw, purchase, loot, room reward, save/load, and event hooks
+  - Keeps Player update compatible by passing enemies and walls through the world object
+  - Adds broader room, shop, artifact, permanent tool, and UI compatibility
+  - Reads old save keys before writing the new 1.0.14 save key
+- Files Modified:
+  - src/js/game.js
+
+Version 1.0.15 (2026-06-05) - UI/HUD Integration Pass
+- Status: UI/HUD integration complete
+- Updated: src/js/ui.js
+- Features:
+  - Replaces ui.js with a defensive UIManager
+  - Preserves existing HUD and overlay IDs
+  - Adds runtime shop overlay, victory overlay, message log, HUD stat display, codex helpers, pause/game over/victory helpers, and canvas prompts
+- Files Modified:
+  - src/js/ui.js
+
+Version 1.0.16 (2026-06-05) - First Playable Bundle Cleanup
+- Status: First 4-file playable integration bundle complete
+- Updated: src/index.html, src/js/game.js, src/js/ui.js, VERSIONS.txt
+- Features:
+  - Packages the first clean 4-file bundle for the integrated playable version
+  - Corrects src/index.html script paths to match the actual project structure where index.html lives inside src/ and JavaScript lives inside src/js/
+  - Keeps all completed systems loaded before player.js, room.js, ui.js, and game.js
+  - Carries forward the 1.0.14 defensive game loop integration
+  - Carries forward the 1.0.15 defensive UI/HUD integration
+  - Adds a complete VERSIONS.txt tracker through Version 1.0.16
+- Files Modified:
+  - src/index.html
+  - src/js/game.js
+  - src/js/ui.js
+  - VERSIONS.txt
+- Next:
+  - Browser test the first playable bundle and fix any live console errors in a narrow 1.0.17 patch

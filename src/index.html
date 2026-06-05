@@ -1,109 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Lab - Roguelite</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The Lab - vanilla JavaScript HTML5 canvas roguelite.">
+  <title>The Lab</title>
+
+  <!--
+    The Lab - Index / Script Load Order
+    Version: 1.0.19
+    File: src/index.html
+    Purpose:
+    - Fix stylesheet path from the browser smoke test.
+    - Keep all script paths relative to src/index.html.
+    - Provide stable DOM IDs for defensive UIManager/game startup code.
+    - Add a small safe boot helper so the Start button can call common game start APIs.
+
+    IMPORTANT PATH RULE:
+    This file belongs at: src/index.html
+    Because style.css is also in src/, the stylesheet URL must be: style.css
+    Because JavaScript files are in src/js/, script URLs must be: js/file.js
+  -->
+
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="game-container">
-        <canvas id="gameCanvas"></canvas>
-        <div id="ui-container">
-            <div id="hud">
-                <div id="health-display">
-                    <span class="label">Brains:</span>
-                    <div id="brain-counter"></div>
-                </div>
-                <div id="floor-display">
-                    <span class="label">Floor:</span>
-                    <span id="floor-number">1</span>
-                </div>
-                <div id="room-display">
-                    <span class="label">Room:</span>
-                    <span id="room-number">1/1</span>
-                </div>
-                <div id="coins-display">
-                    <span class="label">Coins:</span>
-                    <span id="coin-count">0</span>
-                </div>
-            </div>
-            <div id="inventory-display">
-                <span class="label">Equipment:</span>
-                <div id="weapon-slots">
-                    <div class="weapon-slot" id="slot-1">Empty</div>
-                    <div class="weapon-slot" id="slot-2">Empty</div>
-                </div>
-            </div>
-        </div>
-    </div>
+  <main id="app" class="app-shell">
+    <section id="start-screen" class="screen start-screen is-active" aria-label="Start screen">
+      <div class="title-card">
+        <p class="eyebrow">Science Roguelite</p>
+        <h1>The Lab</h1>
+        <p class="subtitle">Choose a specialization, enter the lab, collect tools, and survive the experiment.</p>
 
-    <!-- Menu Overlay -->
-    <div id="menu-overlay" class="overlay">
-        <div class="menu-panel">
-            <h1>THE LAB</h1>
-            <p>A descent into discovery</p>
-            <button id="start-button" class="menu-button">START RUN</button>
-            <button id="codex-button" class="menu-button">CODEX</button>
-            <button id="settings-button" class="menu-button">SETTINGS</button>
+        <div id="start-options" class="start-options">
+          <label for="player-name">Scientist Name</label>
+          <input id="player-name" name="player-name" type="text" maxlength="18" value="Student" autocomplete="off">
         </div>
-    </div>
 
-    <!-- Pause Menu -->
-    <div id="pause-overlay" class="overlay hidden">
-        <div class="menu-panel">
-            <h2>PAUSED</h2>
-            <button id="resume-button" class="menu-button">RESUME</button>
-            <button id="codex-pause-button" class="menu-button">CODEX</button>
-            <button id="quit-button" class="menu-button">QUIT TO MENU</button>
-        </div>
-    </div>
+        <button id="startButton" class="primary-button" type="button" data-action="start-game">Start Run</button>
+        <p id="boot-status" class="status-line" role="status">Ready.</p>
+      </div>
+    </section>
 
-    <!-- Codex -->
-    <div id="codex-overlay" class="overlay hidden">
-        <div class="codex-panel">
-            <h2>CODEX</h2>
-            <div id="codex-content">
-                <div class="codex-section">
-                    <h3>Specializations</h3>
-                    <div id="codex-specs"></div>
-                </div>
-                <div class="codex-section">
-                    <h3>Artifacts</h3>
-                    <div id="codex-artifacts"></div>
-                </div>
-            </div>
-            <button id="close-codex-button" class="menu-button">CLOSE</button>
-        </div>
-    </div>
+    <section id="game-screen" class="screen game-screen" aria-label="Game screen">
+      <header id="hud" class="hud">
+        <div class="hud-item"><span class="hud-label">HP</span><span id="health-value">100</span></div>
+        <div class="hud-item"><span class="hud-label">Gold</span><span id="gold-value">0</span></div>
+        <div class="hud-item"><span class="hud-label">XP</span><span id="xp-value">0</span></div>
+        <div class="hud-item"><span class="hud-label">Floor</span><span id="floor-value">1</span></div>
+      </header>
 
-    <!-- Game Over Screen -->
-    <div id="gameover-overlay" class="overlay hidden">
-        <div class="menu-panel">
-            <h2 id="gameover-title">GAME OVER</h2>
-            <div id="gameover-stats">
-                <p id="gameover-floors">Floors Reached: 1</p>
-                <p id="gameover-rooms">Rooms Cleared: 0</p>
-                <p id="gameover-time">Time: 0:00</p>
-            </div>
-            <button id="retry-button" class="menu-button">TRY AGAIN</button>
-            <button id="menu-button" class="menu-button">MAIN MENU</button>
-        </div>
-    </div>
+      <div id="game-container" class="game-container">
+        <canvas id="gameCanvas" width="800" height="600" aria-label="The Lab game canvas"></canvas>
+      </div>
 
-    <!-- Scripts -->
-    <script src="js/loader.js"></script>
-    <script src="js/specialization.js"></script>
-    <script src="js/projectile.js"></script>
-    <script src="js/artifact.js"></script>
-    <script src="js/consumables.js"></script>
-    <script src="js/permanent_tools.js"></script>
-    <script src="js/loot.js"></script>
-    <script src="js/shop.js"></script>
-    <script src="js/player.js"></script>
-    <script src="js/enemy.js"></script>
-    <script src="js/room.js"></script>
-    <script src="js/ui.js"></script>
-    <script src="js/game.js"></script>
+      <footer id="message-panel" class="message-panel">
+        <span id="game-message">Use WASD or arrow keys to move. Aim with mouse. Click or Space to fire.</span>
+      </footer>
+    </section>
+
+    <div id="overlay" class="overlay hidden" aria-hidden="true"></div>
+    <div id="modal" class="modal hidden" aria-hidden="true"></div>
+    <div id="shop-panel" class="shop-panel hidden" aria-hidden="true"></div>
+    <div id="inventory-panel" class="inventory-panel hidden" aria-hidden="true"></div>
+  </main>
+
+  <!-- Core systems. Keep this order. -->
+  <script src="js/loader.js" defer></script>
+  <script src="js/specialization.js" defer></script>
+  <script src="js/projectile.js" defer></script>
+  <script src="js/player.js" defer></script>
+  <script src="js/enemy.js" defer></script>
+  <script src="js/room.js" defer></script>
+  <script src="js/artifact.js" defer></script>
+  <script src="js/consumables.js" defer></script>
+  <script src="js/permanent_tools.js" defer></script>
+  <script src="js/loot.js" defer></script>
+  <script src="js/shop.js" defer></script>
+  <script src="js/ui.js" defer></script>
+  <script src="js/game.js" defer></script>
+
+  <!-- Defensive boot bridge. This does not replace game.js; it only calls whatever start API exists. -->
+  <script defer>
+    window.addEventListener("DOMContentLoaded", function () {
+      "use strict";
+
+      const startButton = document.getElementById("startButton");
+      const startScreen = document.getElementById("start-screen");
+      const gameScreen = document.getElementById("game-screen");
+      const bootStatus = document.getElementById("boot-status");
+      const gameMessage = document.getElementById("game-message");
+
+      function setStatus(message) {
+        if (bootStatus) bootStatus.textContent = message;
+        if (gameMessage) gameMessage.textContent = message;
+      }
+
+      function showGameScreen() {
+        if (startScreen) startScreen.classList.remove("is-active");
+        if (gameScreen) gameScreen.classList.add("is-active");
+      }
+
+      function callStartApi() {
+        const canvas = document.getElementById("gameCanvas");
+        const playerName = document.getElementById("player-name")?.value || "Student";
+
+        try {
+          if (window.game && typeof window.game.start === "function") {
+            window.game.start({ canvas, playerName });
+            return true;
+          }
+
+          if (window.game && typeof window.game.startGame === "function") {
+            window.game.startGame({ canvas, playerName });
+            return true;
+          }
+
+          if (window.Game && typeof window.Game === "function") {
+            if (!window.game) {
+              window.game = new window.Game({ canvas, playerName });
+            }
+
+            if (typeof window.game.start === "function") {
+              window.game.start({ canvas, playerName });
+              return true;
+            }
+
+            if (typeof window.game.init === "function") {
+              window.game.init({ canvas, playerName });
+              return true;
+            }
+
+            return true;
+          }
+
+          if (window.GameLoader && typeof window.GameLoader === "function") {
+            if (!window.gameLoader) {
+              window.gameLoader = new window.GameLoader({ canvas, playerName });
+            }
+
+            if (typeof window.gameLoader.start === "function") {
+              window.gameLoader.start();
+              return true;
+            }
+
+            if (typeof window.gameLoader.init === "function") {
+              window.gameLoader.init();
+              return true;
+            }
+
+            return true;
+          }
+        } catch (error) {
+          console.error("[The Lab] Start failed:", error);
+          setStatus("Start failed. Check the first red Console error.");
+          return false;
+        }
+
+        return false;
+      }
+
+      if (!startButton) {
+        console.error("[The Lab] Missing #startButton in index.html.");
+        return;
+      }
+
+      startButton.addEventListener("click", function () {
+        showGameScreen();
+        const started = callStartApi();
+        setStatus(started ? "Run started." : "Screen opened, but no game start API was found. Check that js/game.js loaded.");
+      });
+    });
+  </script>
 </body>
 </html>

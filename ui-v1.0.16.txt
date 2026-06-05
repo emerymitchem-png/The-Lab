@@ -1,0 +1,849 @@
+/**
+ * The Lab - UI/HUD Integration Pass
+ * Version: 1.0.15
+ *
+ * File: src/js/ui.js
+ * Replacement: Replace the whole file.
+ *
+ * Purpose:
+ * - Keep the existing HUD and overlay IDs working
+ * - Add robust HUD updates for Player, Loot, Shop, Artifact, Consumable,
+ *   and Permanent Tool systems
+ * - Add canvas overlay prompts for shop rooms, pickups, room clears, pause,
+ *   game over, and victory
+ * - Keep UI code defensive so missing DOM elements do not crash gameplay
+ */
+
+(function () {
+  "use strict";
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function qs(selector) {
+    return document.querySelector(selector);
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function number(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function displayName(item, fallback = "Empty") {
+    if (!item) {
+      return fallback;
+    }
+
+    if (typeof item === "string") {
+      return item;
+    }
+
+    return item.name || item.title || item.id || item.type || item.kind || fallback;
+  }
+
+  function displayIcon(item, fallback = "") {
+    if (!item || typeof item === "string") {
+      return fallback;
+    }
+
+    return item.icon || item.emoji || item.symbol || fallback;
+  }
+
+  function getPlayerHealth(player) {
+    return number(player?.health ?? player?.hp ?? player?.brains, 0);
+  }
+
+  function getPlayerMaxHealth(player) {
+    return Math.max(1, number(player?.maxHealth ?? player?.maxHp ?? player?.maxHP ?? player?.maxBrains, 5));
+  }
+
+  function getPlayerGold(player) {
+    return number(player?.gold ?? player?.coins ?? player?.money, 0);
+  }
+
+  function getPlayerXP(player) {
+    return number(player?.xp ?? player?.experience, 0);
+  }
+
+  function getPlayerLevel(player) {
+    return number(player?.level ?? player?.lvl, 1);
+  }
+
+  function getSystemSaveData(system) {
+    if (!system || typeof system.getSaveData !== "function") {
+      return null;
+    }
+
+    try {
+      return system.getSaveData();
+    } catch (error) {
+      return null;
+    }
+  }
+
+  class UIManager {
+    constructor() {
+      this.messageQueue = [];
+      this.floatingMessages = [];
+      this.lastHudState = null;
+      this.lastShopSignature = "";
+      this.lastRoomClearKey = "";
+      this.isPauseVisible = false;
+      this.isGameOverVisible = false;
+      this.isVictoryVisible = false;
+
+      this.elements = {};
+      this.cacheElements();
+      this.injectRuntimeStyles();
+      this.ensureRuntimePanels();
+      this.bindButtons();
+      this.updateBrainCounter(null);
+    }
+
+    cacheElements() {
+      this.elements = {
+        menuOverlay: $("menu-overlay") || $("menuOverlay"),
+        pauseOverlay: $("pause-overlay") || $("pauseOverlay"),
+        codexOverlay: $("codex-overlay") || $("codexOverlay"),
+        gameOverOverlay: $("gameover-overlay") || $("gameoverOverlay"),
+        gameOverTitle: $("gameover-title"),
+        gameOverFloors: $("gameover-floors"),
+        gameOverRooms: $("gameover-rooms"),
+        gameOverTime: $("gameover-time"),
+        brainCounter: $("brain-counter"),
+        floorNumber: $("floor-number"),
+        roomNumber: $("room-number"),
+        coinCount: $("coin-count"),
+        slot1: $("slot-1"),
+        slot2: $("slot-2"),
+        hud: $("hud"),
+        inventoryDisplay: $("inventory-display"),
+        gameContainer: $("game-container") || document.body
+      };
+    }
+
+    injectRuntimeStyles() {
+      if ($("the-lab-ui-runtime-style")) {
+        return;
+      }
+
+      const style = document.createElement("style");
+      style.id = "the-lab-ui-runtime-style";
+      style.textContent = `
+        .hidden { display: none !important; }
+        .the-lab-runtime-panel {
+          position: fixed;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          z-index: 50;
+          width: min(560px, calc(100vw - 32px));
+          max-height: min(720px, calc(100vh - 32px));
+          overflow: auto;
+          background: rgba(8, 13, 28, 0.96);
+          color: #f8fafc;
+          border: 3px solid #38bdf8;
+          border-radius: 12px;
+          box-shadow: 0 20px 70px rgba(0, 0, 0, 0.65);
+          padding: 18px;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .the-lab-runtime-panel h2,
+        .the-lab-runtime-panel h3 {
+          margin: 0 0 12px;
+          letter-spacing: 0.06em;
+        }
+        .the-lab-runtime-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 8px 0;
+          border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+        }
+        .the-lab-runtime-button {
+          display: inline-block;
+          margin: 8px 8px 0 0;
+          padding: 10px 14px;
+          border: 2px solid #f8fafc;
+          background: #111827;
+          color: #f8fafc;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 700;
+        }
+        .the-lab-runtime-button:hover { background: #1f2937; }
+        #the-lab-message-log {
+          position: fixed;
+          left: 16px;
+          bottom: 16px;
+          z-index: 40;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          pointer-events: none;
+          max-width: min(520px, calc(100vw - 32px));
+        }
+        .the-lab-message {
+          background: rgba(15, 23, 42, 0.88);
+          color: #f8fafc;
+          border-left: 4px solid #38bdf8;
+          padding: 8px 10px;
+          border-radius: 8px;
+          font-size: 13px;
+          line-height: 1.35;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+        }
+        .the-lab-message.good { border-left-color: #22c55e; }
+        .the-lab-message.warn { border-left-color: #f59e0b; }
+        .the-lab-message.bad { border-left-color: #ef4444; }
+        .weapon-slot.filled { color: #f8fafc; border-color: #38bdf8; }
+        .weapon-slot.empty { color: #94a3b8; opacity: 0.8; }
+      `;
+      document.head.appendChild(style);
+    }
+
+    ensureRuntimePanels() {
+      if (!$("the-lab-message-log")) {
+        const log = document.createElement("div");
+        log.id = "the-lab-message-log";
+        document.body.appendChild(log);
+      }
+
+      if (!$("shop-overlay")) {
+        const shop = document.createElement("div");
+        shop.id = "shop-overlay";
+        shop.className = "the-lab-runtime-panel hidden";
+        shop.innerHTML = `
+          <h2>SHOP</h2>
+          <div id="shop-status">Spend coins on useful lab gear.</div>
+          <div id="shop-items"></div>
+          <button id="shop-buy-first" class="the-lab-runtime-button">BUY FIRST ITEM</button>
+          <button id="shop-reroll" class="the-lab-runtime-button">REROLL</button>
+          <button id="shop-close" class="the-lab-runtime-button">CLOSE</button>
+        `;
+        document.body.appendChild(shop);
+      }
+
+      if (!$("victory-overlay")) {
+        const victory = document.createElement("div");
+        victory.id = "victory-overlay";
+        victory.className = "the-lab-runtime-panel hidden";
+        victory.innerHTML = `
+          <h2>RUN COMPLETE</h2>
+          <div id="victory-stats"></div>
+          <button id="victory-restart" class="the-lab-runtime-button">PLAY AGAIN</button>
+        `;
+        document.body.appendChild(victory);
+      }
+    }
+
+    bindButtons() {
+      const startButton = $("start-button") || $("start-game-btn") || $("startGameButton");
+      if (startButton && !startButton.__theLabBound) {
+        startButton.__theLabBound = true;
+        startButton.addEventListener("click", () => {
+          window.gameReady = true;
+          this.hideOverlay(this.elements.menuOverlay);
+        });
+      }
+
+      const resumeButton = $("resume-button");
+      if (resumeButton && !resumeButton.__theLabBound) {
+        resumeButton.__theLabBound = true;
+        resumeButton.addEventListener("click", () => {
+          if (window.game && typeof window.game.togglePause === "function") {
+            window.game.togglePause(false);
+          } else {
+            window.gamePaused = false;
+            this.hidePauseMenu();
+          }
+        });
+      }
+
+      const quitButton = $("quit-button");
+      if (quitButton && !quitButton.__theLabBound) {
+        quitButton.__theLabBound = true;
+        quitButton.addEventListener("click", () => {
+          window.location.reload();
+        });
+      }
+
+      const retryButton = $("retry-button");
+      if (retryButton && !retryButton.__theLabBound) {
+        retryButton.__theLabBound = true;
+        retryButton.addEventListener("click", () => {
+          window.location.reload();
+        });
+      }
+
+      const menuButton = $("menu-button");
+      if (menuButton && !menuButton.__theLabBound) {
+        menuButton.__theLabBound = true;
+        menuButton.addEventListener("click", () => {
+          window.location.reload();
+        });
+      }
+
+      const codexButton = $("codex-button");
+      if (codexButton && !codexButton.__theLabBound) {
+        codexButton.__theLabBound = true;
+        codexButton.addEventListener("click", () => this.showCodex());
+      }
+
+      const codexPauseButton = $("codex-pause-button");
+      if (codexPauseButton && !codexPauseButton.__theLabBound) {
+        codexPauseButton.__theLabBound = true;
+        codexPauseButton.addEventListener("click", () => this.showCodex());
+      }
+
+      const closeCodexButton = $("close-codex-button");
+      if (closeCodexButton && !closeCodexButton.__theLabBound) {
+        closeCodexButton.__theLabBound = true;
+        closeCodexButton.addEventListener("click", () => this.hideOverlay(this.elements.codexOverlay));
+      }
+
+      const shopBuyFirst = $("shop-buy-first");
+      if (shopBuyFirst && !shopBuyFirst.__theLabBound) {
+        shopBuyFirst.__theLabBound = true;
+        shopBuyFirst.addEventListener("click", () => {
+          if (window.buyShopItem) {
+            window.buyShopItem(0);
+          }
+        });
+      }
+
+      const shopReroll = $("shop-reroll");
+      if (shopReroll && !shopReroll.__theLabBound) {
+        shopReroll.__theLabBound = true;
+        shopReroll.addEventListener("click", () => {
+          if (window.rerollShop) {
+            window.rerollShop();
+          }
+        });
+      }
+
+      const shopClose = $("shop-close");
+      if (shopClose && !shopClose.__theLabBound) {
+        shopClose.__theLabBound = true;
+        shopClose.addEventListener("click", () => this.hideShop());
+      }
+
+      const victoryRestart = $("victory-restart");
+      if (victoryRestart && !victoryRestart.__theLabBound) {
+        victoryRestart.__theLabBound = true;
+        victoryRestart.addEventListener("click", () => window.location.reload());
+      }
+    }
+
+    showOverlay(element) {
+      if (!element) {
+        return;
+      }
+      element.classList.remove("hidden");
+      element.style.display = "";
+    }
+
+    hideOverlay(element) {
+      if (!element) {
+        return;
+      }
+      element.classList.add("hidden");
+      element.style.display = "none";
+    }
+
+    formatTime(seconds) {
+      const safe = Math.max(0, Math.floor(number(seconds, 0)));
+      const minutes = Math.floor(safe / 60);
+      const secs = safe % 60;
+      return `${minutes}:${String(secs).padStart(2, "0")}`;
+    }
+
+    updateHUD(player, floor = 1, room = 1, totalRooms = 1, context = {}) {
+      this.cacheElements();
+
+      const resolvedContext = this.normalizeContext(player, floor, room, totalRooms, context);
+      const resolvedPlayer = resolvedContext.player;
+
+      this.updateBrainCounter(resolvedPlayer);
+      this.updateText(this.elements.floorNumber, String(resolvedContext.floor));
+      this.updateText(this.elements.roomNumber, `${resolvedContext.roomNumber}/${resolvedContext.totalRoomsPerFloor}`);
+      this.updateText(this.elements.coinCount, String(Math.floor(getPlayerGold(resolvedPlayer))));
+      this.updateEquipmentSlots(resolvedPlayer);
+      this.updateRuntimeMessages();
+      this.updateShopPanel(resolvedContext);
+
+      this.lastHudState = {
+        health: getPlayerHealth(resolvedPlayer),
+        maxHealth: getPlayerMaxHealth(resolvedPlayer),
+        gold: getPlayerGold(resolvedPlayer),
+        xp: getPlayerXP(resolvedPlayer),
+        level: getPlayerLevel(resolvedPlayer),
+        floor: resolvedContext.floor,
+        room: resolvedContext.roomNumber
+      };
+    }
+
+    normalizeContext(player, floor, room, totalRooms, context) {
+      if (player && player.player && typeof player === "object") {
+        context = player;
+        player = context.player;
+        floor = context.floor ?? context.currentFloor ?? 1;
+        room = context.roomNumber ?? context.currentRoom ?? 1;
+        totalRooms = context.totalRoomsPerFloor ?? context.totalRooms ?? 1;
+      }
+
+      return {
+        ...(context || {}),
+        player: player || context?.player || window.game?.player || null,
+        floor: number(floor ?? context?.floor ?? context?.currentFloor ?? window.game?.currentFloor, 1),
+        roomNumber: number(room ?? context?.roomNumber ?? context?.currentRoom ?? window.game?.currentRoom, 1),
+        totalRoomsPerFloor: Math.max(1, number(totalRooms ?? context?.totalRoomsPerFloor ?? window.game?.totalRoomsPerFloor, 1))
+      };
+    }
+
+    updateText(element, text) {
+      if (element) {
+        element.textContent = text;
+      }
+    }
+
+    updateBrainCounter(player) {
+      const el = this.elements.brainCounter || $("brain-counter");
+      if (!el) {
+        return;
+      }
+
+      if (!player) {
+        el.textContent = "🧠🧠🧠🧠🧠";
+        return;
+      }
+
+      const health = Math.ceil(getPlayerHealth(player));
+      const maxHealth = Math.ceil(getPlayerMaxHealth(player));
+
+      if (maxHealth <= 12) {
+        const full = "🧠".repeat(clamp(health, 0, maxHealth));
+        const empty = "♡".repeat(Math.max(0, maxHealth - health));
+        el.textContent = `${full}${empty}`;
+        return;
+      }
+
+      el.textContent = `🧠 ${health}/${maxHealth}`;
+    }
+
+    updateEquipmentSlots(player) {
+      const slot1 = this.elements.slot1 || $("slot-1");
+      const slot2 = this.elements.slot2 || $("slot-2");
+      if (!slot1 && !slot2) {
+        return;
+      }
+
+      const equipment = this.getEquipment(player);
+      this.renderSlot(slot1, equipment[0], "Slot 1");
+      this.renderSlot(slot2, equipment[1], "Slot 2");
+    }
+
+    getEquipment(player) {
+      if (!player) {
+        return [null, null];
+      }
+
+      const artifactSystem = player.artifactSystem || player.artifacts;
+      const artifactSave = getSystemSaveData(artifactSystem);
+
+      const possibleLists = [
+        player.weaponArtifacts,
+        player.equippedArtifacts,
+        player.activeArtifacts,
+        player.inventory,
+        artifactSystem?.equipped,
+        artifactSystem?.equippedArtifacts,
+        artifactSystem?.activeArtifacts,
+        artifactSave?.equipped,
+        artifactSave?.equippedArtifacts,
+        artifactSave?.activeArtifacts
+      ];
+
+      for (const list of possibleLists) {
+        if (Array.isArray(list) && list.length > 0) {
+          return [list[0] || null, list[1] || null];
+        }
+      }
+
+      return [player.weaponSlot1 || null, player.weaponSlot2 || null];
+    }
+
+    renderSlot(element, item, label) {
+      if (!element) {
+        return;
+      }
+
+      const name = displayName(item, "Empty");
+      const icon = displayIcon(item, "");
+      element.textContent = item ? `${icon ? icon + " " : ""}${name}` : "Empty";
+      element.title = item ? `${label}: ${name}` : `${label}: Empty`;
+      element.classList.toggle("filled", Boolean(item));
+      element.classList.toggle("empty", !item);
+    }
+
+    updateShopPanel(context) {
+      const shopOverlay = $("shop-overlay");
+      if (!shopOverlay) {
+        return;
+      }
+
+      const shopSystem = context.shopSystem || window.game?.shopSystem;
+      const room = context.room || context.currentRoomObject;
+      const isShopRoom = this.isShopRoom(room);
+      const isActive = Boolean(shopSystem && (shopSystem.active || shopSystem.isActive || isShopRoom));
+
+      if (!isActive) {
+        this.hideShop();
+        return;
+      }
+
+      this.showOverlay(shopOverlay);
+      const shopStatus = $("shop-status");
+      const shopItems = $("shop-items");
+
+      if (shopStatus) {
+        shopStatus.textContent = `Coins: ${Math.floor(getPlayerGold(context.player))} | Press B or Enter to buy the first item. Press R to reroll.`;
+      }
+
+      if (!shopItems) {
+        return;
+      }
+
+      const items = this.getShopItems(shopSystem);
+      const signature = JSON.stringify(items.map((item) => ({
+        id: item?.id,
+        name: item?.name,
+        price: item?.price ?? item?.cost,
+        sold: item?.soldOut ?? item?.sold
+      })));
+
+      if (signature === this.lastShopSignature) {
+        return;
+      }
+
+      this.lastShopSignature = signature;
+      shopItems.innerHTML = "";
+
+      if (!items.length) {
+        shopItems.innerHTML = `<div class="the-lab-runtime-row"><span>No items listed yet.</span><span>Explore or reroll.</span></div>`;
+        return;
+      }
+
+      items.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = "the-lab-runtime-row";
+        const name = `${displayIcon(item)} ${displayName(item, `Item ${index + 1}`)}`.trim();
+        const price = item?.price ?? item?.cost ?? item?.value ?? "?";
+        const sold = item?.soldOut || item?.sold || item?.purchased;
+        row.innerHTML = `
+          <span>${escapeHtml(name)}</span>
+          <span>${sold ? "SOLD" : `${escapeHtml(price)} coins`}</span>
+        `;
+        row.addEventListener("click", () => {
+          if (window.buyShopItem) {
+            window.buyShopItem(index);
+          }
+        });
+        shopItems.appendChild(row);
+      });
+    }
+
+    getShopItems(shopSystem) {
+      if (!shopSystem) {
+        return [];
+      }
+
+      const save = getSystemSaveData(shopSystem);
+      const list =
+        shopSystem.inventory ||
+        shopSystem.items ||
+        shopSystem.stock ||
+        shopSystem.shopItems ||
+        shopSystem.currentInventory ||
+        save?.inventory ||
+        save?.items ||
+        save?.stock;
+
+      return Array.isArray(list) ? list : [];
+    }
+
+    isShopRoom(room) {
+      if (!room) {
+        return false;
+      }
+
+      const type = String(room.type || room.roomType || room.kind || room.category || room.name || "").toLowerCase();
+      return Boolean(room.isShop || room.shop || room.hasShop || type.includes("shop") || type.includes("store") || type.includes("vending"));
+    }
+
+    hideShop() {
+      const shopOverlay = $("shop-overlay");
+      if (shopOverlay) {
+        this.hideOverlay(shopOverlay);
+      }
+    }
+
+    showPauseMenu() {
+      this.isPauseVisible = true;
+      this.showOverlay(this.elements.pauseOverlay || $("pause-overlay"));
+    }
+
+    hidePauseMenu() {
+      this.isPauseVisible = false;
+      this.hideOverlay(this.elements.pauseOverlay || $("pause-overlay"));
+    }
+
+    resume() {
+      this.hidePauseMenu();
+    }
+
+    closePauseMenu() {
+      this.hidePauseMenu();
+    }
+
+    showGameOver(stats = {}) {
+      this.isGameOverVisible = true;
+      const overlay = this.elements.gameOverOverlay || $("gameover-overlay") || $("gameoverOverlay");
+      this.showOverlay(overlay);
+
+      this.updateText(this.elements.gameOverTitle || $("gameover-title"), "GAME OVER");
+      this.updateText(this.elements.gameOverFloors || $("gameover-floors"), `Floors Reached: ${stats.floorsReached ?? stats.floor ?? 1}`);
+      this.updateText(this.elements.gameOverRooms || $("gameover-rooms"), `Rooms Cleared: ${stats.roomsCleared ?? 0}`);
+      this.updateText(this.elements.gameOverTime || $("gameover-time"), `Time: ${this.formatTime(stats.elapsedTime ?? 0)}`);
+    }
+
+    showVictory(stats = {}) {
+      this.isVictoryVisible = true;
+      const overlay = $("victory-overlay");
+      const statsBox = $("victory-stats");
+      this.showOverlay(overlay);
+
+      if (statsBox) {
+        statsBox.innerHTML = `
+          <div class="the-lab-runtime-row"><span>Floors Reached</span><strong>${escapeHtml(stats.floorsReached ?? 5)}</strong></div>
+          <div class="the-lab-runtime-row"><span>Rooms Cleared</span><strong>${escapeHtml(stats.roomsCleared ?? 0)}</strong></div>
+          <div class="the-lab-runtime-row"><span>Enemies Defeated</span><strong>${escapeHtml(stats.enemiesKilled ?? 0)}</strong></div>
+          <div class="the-lab-runtime-row"><span>Coins Collected</span><strong>${escapeHtml(stats.totalCoins ?? 0)}</strong></div>
+          <div class="the-lab-runtime-row"><span>Time</span><strong>${escapeHtml(this.formatTime(stats.elapsedTime ?? 0))}</strong></div>
+        `;
+      }
+    }
+
+    showCodex() {
+      const overlay = this.elements.codexOverlay || $("codex-overlay");
+      if (!overlay) {
+        this.addMessage("Codex is not available in this HTML yet.", "warn");
+        return;
+      }
+
+      this.populateCodex();
+      this.showOverlay(overlay);
+    }
+
+    populateCodex() {
+      const specBox = $("codex-specs");
+      const artifactBox = $("codex-artifacts");
+      const player = window.game?.player;
+
+      if (specBox) {
+        const specSystem = player?.specializationSystem || player?.specializations;
+        const save = getSystemSaveData(specSystem);
+        const active = specSystem?.active || specSystem?.equipped || save?.active || save?.equipped || [];
+        const unlocked = specSystem?.unlocked || save?.unlocked || [];
+        specBox.innerHTML = `
+          <p><strong>Active:</strong> ${escapeHtml(Array.isArray(active) && active.length ? active.map(displayName).join(", ") : "Student")}</p>
+          <p><strong>Unlocked:</strong> ${escapeHtml(Array.isArray(unlocked) && unlocked.length ? unlocked.map(displayName).join(", ") : "None yet")}</p>
+        `;
+      }
+
+      if (artifactBox) {
+        const equipment = this.getEquipment(player).filter(Boolean);
+        artifactBox.innerHTML = `
+          <p><strong>Equipped:</strong> ${escapeHtml(equipment.length ? equipment.map(displayName).join(", ") : "None yet")}</p>
+        `;
+      }
+    }
+
+    addMessage(text, type = "info", duration = 2600) {
+      const message = {
+        text: String(text ?? ""),
+        type,
+        duration,
+        createdAt: performance.now()
+      };
+      this.messageQueue.push(message);
+      this.renderMessageLog();
+    }
+
+    showMessage(text, type = "info", duration = 2600) {
+      this.addMessage(text, type, duration);
+    }
+
+    notify(text, type = "info", duration = 2600) {
+      this.addMessage(text, type, duration);
+    }
+
+    updateRuntimeMessages() {
+      const now = performance.now();
+      const before = this.messageQueue.length;
+      this.messageQueue = this.messageQueue.filter((message) => now - message.createdAt < message.duration);
+      if (before !== this.messageQueue.length) {
+        this.renderMessageLog();
+      }
+    }
+
+    renderMessageLog() {
+      const log = $("the-lab-message-log");
+      if (!log) {
+        return;
+      }
+
+      log.innerHTML = "";
+      for (const message of this.messageQueue.slice(-5)) {
+        const div = document.createElement("div");
+        div.className = `the-lab-message ${message.type || "info"}`;
+        div.textContent = message.text;
+        log.appendChild(div);
+      }
+    }
+
+    draw(ctx, context = {}) {
+      if (!ctx) {
+        return;
+      }
+
+      this.drawTopLeftRuntimeStats(ctx, context);
+      this.drawShopCanvasPrompt(ctx, context);
+      this.drawRoomClearPrompt(ctx, context);
+      this.drawPauseTint(ctx);
+    }
+
+    drawTopLeftRuntimeStats(ctx, context) {
+      const player = context.player || window.game?.player;
+      if (!player) {
+        return;
+      }
+
+      const level = getPlayerLevel(player);
+      const xp = Math.floor(getPlayerXP(player));
+      const atk = number(player.damage ?? player.attack ?? player.atk, 0);
+      const def = number(player.defense ?? player.def ?? player.armor, 0);
+
+      ctx.save();
+      ctx.font = "12px Courier New, monospace";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      ctx.fillRect(10, 10, 190, 58);
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillText(`LV ${level}   XP ${xp}`, 18, 18);
+      ctx.fillText(`ATK ${atk}   DEF ${def}`, 18, 34);
+      ctx.fillText(`Gold ${Math.floor(getPlayerGold(player))}`, 18, 50);
+      ctx.restore();
+    }
+
+    drawShopCanvasPrompt(ctx, context) {
+      const shopSystem = context.shopSystem || window.game?.shopSystem;
+      const room = context.room || context.currentRoomObject;
+      if (!shopSystem || !this.isShopRoom(room)) {
+        return;
+      }
+
+      const text = "SHOP: B/ENTER buys first item • R rerolls";
+      this.drawCenteredBanner(ctx, text, 86, "#38bdf8");
+    }
+
+    drawRoomClearPrompt(ctx, context) {
+      const game = context.game || window.game;
+      if (!game || !game.currentRoomObject) {
+        return;
+      }
+
+      const roomKey = `${game.currentFloor || 1}-${game.currentRoom || 1}`;
+      const isCleared = typeof game.isCurrentRoomCleared === "function"
+        ? game.isCurrentRoomCleared()
+        : false;
+
+      if (!isCleared || this.lastRoomClearKey === roomKey) {
+        return;
+      }
+
+      this.drawCenteredBanner(ctx, "ROOM CLEAR", 132, "#22c55e");
+    }
+
+    drawPauseTint(ctx) {
+      if (!window.gamePaused && !this.isPauseVisible) {
+        return;
+      }
+
+      ctx.save();
+      ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+    }
+
+    drawCenteredBanner(ctx, text, y, color) {
+      ctx.save();
+      ctx.font = "bold 16px Courier New, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const width = Math.min(ctx.canvas.width - 32, Math.max(280, text.length * 10));
+      const x = ctx.canvas.width / 2 - width / 2;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
+      ctx.fillRect(x, y - 22, width, 44);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y - 22, width, 44);
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillText(text, ctx.canvas.width / 2, y);
+      ctx.restore();
+    }
+  }
+
+  window.UIManager = UIManager;
+  window.uiManager = window.uiManager || new UIManager();
+})();
+
+/*
+VERSIONS.txt entry:
+
+Version 1.0.15 (2026-06-05) - UI/HUD Integration Pass
+- Status: UI/HUD integration complete
+- Updated: src/js/ui.js
+- Features:
+  - Replaces the whole ui.js file with a defensive UIManager
+  - Preserves existing HUD IDs: brain-counter, floor-number, room-number, coin-count, slot-1, and slot-2
+  - Preserves existing overlay IDs: menu-overlay, pause-overlay, codex-overlay, gameover-overlay, retry-button, menu-button, resume-button, and start-button
+  - Adds runtime shop overlay if the HTML does not already provide one
+  - Adds runtime victory overlay if the HTML does not already provide one
+  - Adds runtime message log for pickups, warnings, and system feedback
+  - Displays health as brains for small HP pools and numeric brains for larger HP pools
+  - Updates floor, room, coin, XP, level, attack, defense, and equipment display from Player/game context
+  - Reads artifact/specialization save data defensively when systems expose getSaveData()
+  - Adds shop item rendering from inventory/items/stock/currentInventory style properties
+  - Adds clickable shop rows plus BUY FIRST ITEM and REROLL buttons wired to game integration helpers
+  - Adds canvas overlay prompts for shop rooms and room clear moments
+  - Adds pause, game over, victory, codex, and message helper methods expected by game.js
+- Files Modified:
+  - src/js/ui.js
+- Next:
+  - Begin 1.0.16 First Playable Bundle Cleanup
+*/

@@ -7,19 +7,37 @@
   <title>The Lab</title>
 
   <!--
-    The Lab - Index / Script Load Order
-    Version: 1.0.19
+    The Lab - Index / Start Loader Hotfix
+    Version: 1.0.19.1
     File: src/index.html
-    Purpose:
-    - Fix stylesheet path from the browser smoke test.
-    - Keep all script paths relative to src/index.html.
-    - Provide stable DOM IDs for defensive UIManager/game startup code.
-    - Add a small safe boot helper so the Start button can call common game start APIs.
+    Replacement: Replace the whole file
 
-    IMPORTANT PATH RULE:
-    This file belongs at: src/index.html
-    Because style.css is also in src/, the stylesheet URL must be: style.css
-    Because JavaScript files are in src/js/, script URLs must be: js/file.js
+    Purpose:
+    - Keep stylesheet path correct for src/index.html -> src/style.css.
+    - Load all vanilla JS files from src/js/ in the required order.
+    - Show clear load status for each script, especially js/game.js.
+    - Make the Start button call a wide range of possible game start APIs.
+    - Provide a safe canvas fallback only if the full game API is not exposed.
+
+    Folder expectation:
+    The-Lab/
+      src/
+        index.html
+        style.css
+        js/
+          loader.js
+          specialization.js
+          projectile.js
+          player.js
+          enemy.js
+          room.js
+          artifact.js
+          consumables.js
+          permanent_tools.js
+          loot.js
+          shop.js
+          ui.js
+          game.js
   -->
 
   <link rel="stylesheet" href="style.css">
@@ -38,7 +56,8 @@
         </div>
 
         <button id="startButton" class="primary-button" type="button" data-action="start-game">Start Run</button>
-        <p id="boot-status" class="status-line" role="status">Ready.</p>
+        <p id="boot-status" class="status-line" role="status">Loading game files...</p>
+        <pre id="boot-log" class="boot-log" aria-label="Boot log"></pre>
       </div>
     </section>
 
@@ -65,45 +84,113 @@
     <div id="inventory-panel" class="inventory-panel hidden" aria-hidden="true"></div>
   </main>
 
-  <!-- Core systems. Keep this order. -->
-  <script src="js/loader.js" defer></script>
-  <script src="js/specialization.js" defer></script>
-  <script src="js/projectile.js" defer></script>
-  <script src="js/player.js" defer></script>
-  <script src="js/enemy.js" defer></script>
-  <script src="js/room.js" defer></script>
-  <script src="js/artifact.js" defer></script>
-  <script src="js/consumables.js" defer></script>
-  <script src="js/permanent_tools.js" defer></script>
-  <script src="js/loot.js" defer></script>
-  <script src="js/shop.js" defer></script>
-  <script src="js/ui.js" defer></script>
-  <script src="js/game.js" defer></script>
-
-  <!-- Defensive boot bridge. This does not replace game.js; it only calls whatever start API exists. -->
-  <script defer>
-    window.addEventListener("DOMContentLoaded", function () {
+  <script>
+    (function () {
       "use strict";
 
-      const startButton = document.getElementById("startButton");
-      const startScreen = document.getElementById("start-screen");
-      const gameScreen = document.getElementById("game-screen");
-      const bootStatus = document.getElementById("boot-status");
-      const gameMessage = document.getElementById("game-message");
+      const THE_LAB_VERSION = "1.0.19.1";
+      const SCRIPT_PATHS = [
+        "js/loader.js",
+        "js/specialization.js",
+        "js/projectile.js",
+        "js/player.js",
+        "js/enemy.js",
+        "js/room.js",
+        "js/artifact.js",
+        "js/consumables.js",
+        "js/permanent_tools.js",
+        "js/loot.js",
+        "js/shop.js",
+        "js/ui.js",
+        "js/game.js"
+      ];
 
-      function setStatus(message) {
-        if (bootStatus) bootStatus.textContent = message;
-        if (gameMessage) gameMessage.textContent = message;
+      const loadedScripts = [];
+      const failedScripts = [];
+      let scriptsReady = false;
+
+      function byId(id) {
+        return document.getElementById(id);
+      }
+
+      function setText(id, text) {
+        const node = byId(id);
+        if (node) {
+          node.textContent = text;
+        }
+      }
+
+      function appendBootLog(message) {
+        const log = byId("boot-log");
+        const line = `[${new Date().toLocaleTimeString()}] ${message}`;
+        console.log(`[The Lab ${THE_LAB_VERSION}] ${message}`);
+
+        if (log) {
+          log.textContent += `${line}\n`;
+        }
+      }
+
+      function setBootStatus(message) {
+        setText("boot-status", message);
+        setText("game-message", message);
       }
 
       function showGameScreen() {
-        if (startScreen) startScreen.classList.remove("is-active");
-        if (gameScreen) gameScreen.classList.add("is-active");
+        const startScreen = byId("start-screen");
+        const gameScreen = byId("game-screen");
+
+        if (startScreen) {
+          startScreen.classList.remove("is-active");
+        }
+
+        if (gameScreen) {
+          gameScreen.classList.add("is-active");
+        }
+      }
+
+      function loadScript(path) {
+        return new Promise((resolve) => {
+          const script = document.createElement("script");
+          script.src = path;
+          script.async = false;
+
+          script.onload = function () {
+            loadedScripts.push(path);
+            appendBootLog(`Loaded ${path}`);
+            resolve(true);
+          };
+
+          script.onerror = function () {
+            failedScripts.push(path);
+            appendBootLog(`FAILED ${path}`);
+            resolve(false);
+          };
+
+          document.body.appendChild(script);
+        });
+      }
+
+      async function loadGameScripts() {
+        appendBootLog("Starting ordered script load from src/index.html.");
+
+        for (const path of SCRIPT_PATHS) {
+          await loadScript(path);
+        }
+
+        scriptsReady = true;
+
+        if (failedScripts.length > 0) {
+          setBootStatus(`Some files failed to load: ${failedScripts.join(", ")}`);
+          appendBootLog(`FAILED: ${failedScripts.join(", ")}`);
+        } else {
+          setBootStatus("Ready. Click Start Run to begin.");
+          appendBootLog("All scripts loaded successfully.");
+        }
       }
 
       function callStartApi() {
-        const canvas = document.getElementById("gameCanvas");
-        const playerName = document.getElementById("player-name")?.value || "Student";
+        const canvas = byId("gameCanvas");
+        const playerName = (byId("player-name") && byId("player-name").value) || "Student";
 
         try {
           if (window.game && typeof window.game.start === "function") {
@@ -153,24 +240,42 @@
           }
         } catch (error) {
           console.error("[The Lab] Start failed:", error);
-          setStatus("Start failed. Check the first red Console error.");
+          setBootStatus("Start failed. Check the first red Console error.");
+          appendBootLog(`ERROR: ${error.message}`);
           return false;
         }
 
         return false;
       }
 
-      if (!startButton) {
-        console.error("[The Lab] Missing #startButton in index.html.");
-        return;
-      }
+      window.addEventListener("DOMContentLoaded", function () {
+        appendBootLog("DOMContentLoaded fired. Beginning initialization.");
 
-      startButton.addEventListener("click", function () {
-        showGameScreen();
-        const started = callStartApi();
-        setStatus(started ? "Run started." : "Screen opened, but no game start API was found. Check that js/game.js loaded.");
+        const startButton = byId("startButton");
+
+        if (!startButton) {
+          appendBootLog("ERROR: #startButton not found in DOM.");
+          setBootStatus("ERROR: Start button not found.");
+          return;
+        }
+
+        loadGameScripts().then(() => {
+          startButton.addEventListener("click", function () {
+            appendBootLog("Start button clicked.");
+            showGameScreen();
+            const started = callStartApi();
+
+            if (started) {
+              appendBootLog("Game start API called successfully.");
+              setBootStatus("Run started.");
+            } else {
+              appendBootLog("Game start failed: no compatible API found.");
+              setBootStatus("Screen opened, but no game start API was found. Check console.");
+            }
+          });
+        });
       });
-    });
+    })();
   </script>
 </body>
 </html>

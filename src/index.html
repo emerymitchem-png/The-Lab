@@ -1,280 +1,976 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The Lab - vanilla JavaScript HTML5 canvas roguelite.">
-  <title>The Lab</title>
-
   <!--
-    The Lab - Index / Start Loader Hotfix
-    Version: 1.0.19.1
-    File: src/index.html
-    Replacement: Replace the whole file
-
+    The Lab - Index Loader
+    Version: 1.0.19.2
+    File: src/index.html or index.html
     Purpose:
-    - Keep stylesheet path correct for src/index.html -> src/style.css.
-    - Load all vanilla JS files from src/js/ in the required order.
-    - Show clear load status for each script, especially js/game.js.
-    - Make the Start button call a wide range of possible game start APIs.
-    - Provide a safe canvas fallback only if the full game API is not exposed.
-
-    Folder expectation:
-    The-Lab/
-      src/
-        index.html
-        style.css
-        js/
-          loader.js
-          specialization.js
-          projectile.js
-          player.js
-          enemy.js
-          room.js
-          artifact.js
-          consumables.js
-          permanent_tools.js
-          loot.js
-          shop.js
-          ui.js
-          game.js
+    - Load The Lab locally even when the repo folder layout is slightly different
+    - Probe multiple safe local paths for style.css and JavaScript files
+    - Keep script loading ordered and visible through a boot log
+    - Start the game through whichever start API the loaded game.js exposes
   -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Lab</title>
+  <style>
+    :root {
+      --lab-bg: #020617;
+      --lab-panel: #0f172a;
+      --lab-panel-2: #111827;
+      --lab-text: #e5e7eb;
+      --lab-muted: #94a3b8;
+      --lab-cyan: #38bdf8;
+      --lab-green: #22c55e;
+      --lab-orange: #f97316;
+      --lab-red: #ef4444;
+      --lab-border: rgba(148, 163, 184, 0.35);
+      --lab-shadow: rgba(0, 0, 0, 0.5);
+    }
 
-  <link rel="stylesheet" href="style.css">
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(circle at top, #0f172a 0, var(--lab-bg) 58%);
+      color: var(--lab-text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .app-shell {
+      width: min(1120px, 100%);
+      display: grid;
+      gap: 14px;
+    }
+
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 14px 16px;
+      border: 1px solid var(--lab-border);
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.88);
+      box-shadow: 0 18px 45px var(--lab-shadow);
+    }
+
+    .title-wrap {
+      display: grid;
+      gap: 2px;
+    }
+
+    h1 {
+      margin: 0;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: clamp(1.4rem, 4vw, 2.2rem);
+      line-height: 1;
+    }
+
+    .subtitle {
+      color: var(--lab-muted);
+      font-size: 0.94rem;
+    }
+
+    .hud {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .hud-pill {
+      min-width: 78px;
+      padding: 8px 10px;
+      border: 1px solid var(--lab-border);
+      border-radius: 999px;
+      background: rgba(2, 6, 23, 0.72);
+      color: var(--lab-text);
+      text-align: center;
+      font-weight: 800;
+      font-size: 0.92rem;
+    }
+
+    .hud-pill span {
+      color: var(--lab-cyan);
+    }
+
+    .game-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .game-panel,
+    .side-panel {
+      border: 1px solid var(--lab-border);
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.88);
+      box-shadow: 0 18px 45px var(--lab-shadow);
+      overflow: hidden;
+    }
+
+    .game-panel {
+      position: relative;
+      min-height: 520px;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+    }
+
+    #gameCanvas,
+    canvas {
+      display: block;
+      width: 100%;
+      max-width: 760px;
+      aspect-ratio: 4 / 3;
+      height: auto;
+      border: 2px solid rgba(56, 189, 248, 0.5);
+      border-radius: 12px;
+      background: #020617;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .start-screen {
+      position: absolute;
+      inset: 12px;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      border-radius: 13px;
+      background:
+        linear-gradient(rgba(2, 6, 23, 0.85), rgba(2, 6, 23, 0.92)),
+        repeating-linear-gradient(45deg, rgba(56, 189, 248, 0.09) 0 8px, transparent 8px 16px);
+      z-index: 10;
+    }
+
+    .start-card {
+      width: min(520px, 100%);
+      display: grid;
+      gap: 14px;
+      text-align: center;
+      padding: 26px;
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.92);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+    }
+
+    .start-card h2 {
+      margin: 0;
+      font-size: clamp(1.5rem, 4vw, 2.3rem);
+    }
+
+    .start-card p {
+      margin: 0;
+      color: var(--lab-muted);
+      line-height: 1.5;
+    }
+
+    .primary-button {
+      justify-self: center;
+      cursor: pointer;
+      border: 0;
+      border-radius: 999px;
+      padding: 13px 22px;
+      color: #03131d;
+      background: linear-gradient(135deg, var(--lab-cyan), var(--lab-green));
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      box-shadow: 0 12px 30px rgba(56, 189, 248, 0.25);
+    }
+
+    .primary-button:hover,
+    .primary-button:focus-visible {
+      transform: translateY(-1px);
+      outline: 2px solid rgba(255, 255, 255, 0.75);
+      outline-offset: 3px;
+    }
+
+    .small-button {
+      cursor: pointer;
+      border: 1px solid var(--lab-border);
+      border-radius: 999px;
+      padding: 8px 11px;
+      color: var(--lab-text);
+      background: rgba(2, 6, 23, 0.65);
+      font-weight: 700;
+    }
+
+    .side-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 520px;
+    }
+
+    .side-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--lab-border);
+      background: rgba(2, 6, 23, 0.35);
+    }
+
+    .side-header h2 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    #bootLog {
+      min-height: 0;
+      overflow: auto;
+      padding: 12px 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+    }
+
+    .log-good {
+      color: #86efac;
+    }
+
+    .log-bad {
+      color: #fca5a5;
+    }
+
+    .log-warn {
+      color: #fdba74;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 860px) {
+      body {
+        padding: 10px;
+      }
+
+      .game-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .game-panel,
+      .side-panel {
+        min-height: 360px;
+      }
+
+      .side-panel {
+        max-height: 260px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <main id="app" class="app-shell">
-    <section id="start-screen" class="screen start-screen is-active" aria-label="Start screen">
-      <div class="title-card">
-        <p class="eyebrow">Science Roguelite</p>
+  <main class="app-shell" id="app">
+    <section class="top-bar" aria-label="Game status">
+      <div class="title-wrap">
         <h1>The Lab</h1>
-        <p class="subtitle">Choose a specialization, enter the lab, collect tools, and survive the experiment.</p>
+        <div class="subtitle">Local loader v1.0.19.2</div>
+      </div>
 
-        <div id="start-options" class="start-options">
-          <label for="player-name">Scientist Name</label>
-          <input id="player-name" name="player-name" type="text" maxlength="18" value="Student" autocomplete="off">
-        </div>
-
-        <button id="startButton" class="primary-button" type="button" data-action="start-game">Start Run</button>
-        <p id="boot-status" class="status-line" role="status">Loading game files...</p>
-        <pre id="boot-log" class="boot-log" aria-label="Boot log"></pre>
+      <div class="hud" id="hud">
+        <div class="hud-pill">HP <span id="hpValue">100</span></div>
+        <div class="hud-pill">Gold <span id="goldValue">0</span></div>
+        <div class="hud-pill">XP <span id="xpValue">0</span></div>
+        <div class="hud-pill">Floor <span id="floorValue">1</span></div>
       </div>
     </section>
 
-    <section id="game-screen" class="screen game-screen" aria-label="Game screen">
-      <header id="hud" class="hud">
-        <div class="hud-item"><span class="hud-label">HP</span><span id="health-value">100</span></div>
-        <div class="hud-item"><span class="hud-label">Gold</span><span id="gold-value">0</span></div>
-        <div class="hud-item"><span class="hud-label">XP</span><span id="xp-value">0</span></div>
-        <div class="hud-item"><span class="hud-label">Floor</span><span id="floor-value">1</span></div>
-      </header>
-
-      <div id="game-container" class="game-container">
+    <section class="game-layout">
+      <section class="game-panel" id="gamePanel">
         <canvas id="gameCanvas" width="800" height="600" aria-label="The Lab game canvas"></canvas>
-      </div>
 
-      <footer id="message-panel" class="message-panel">
-        <span id="game-message">Use WASD or arrow keys to move. Aim with mouse. Click or Space to fire.</span>
-      </footer>
+        <div class="start-screen" id="startScreen">
+          <div class="start-card">
+            <h2>Enter The Lab</h2>
+            <p id="startStatus">Loading local files...</p>
+            <button class="primary-button" id="startButton" type="button">Start Run</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side-panel" aria-label="Boot log">
+        <div class="side-header">
+          <h2>Boot Log</h2>
+          <button class="small-button" id="copyLogButton" type="button">Copy</button>
+        </div>
+        <div id="bootLog"></div>
+      </aside>
     </section>
-
-    <div id="overlay" class="overlay hidden" aria-hidden="true"></div>
-    <div id="modal" class="modal hidden" aria-hidden="true"></div>
-    <div id="shop-panel" class="shop-panel hidden" aria-hidden="true"></div>
-    <div id="inventory-panel" class="inventory-panel hidden" aria-hidden="true"></div>
   </main>
 
   <script>
     (function () {
       "use strict";
 
-      const THE_LAB_VERSION = "1.0.19.1";
-      const SCRIPT_PATHS = [
-        "js/loader.js",
-        "js/specialization.js",
-        "js/projectile.js",
-        "js/player.js",
-        "js/enemy.js",
-        "js/room.js",
-        "js/artifact.js",
-        "js/consumables.js",
-        "js/permanent_tools.js",
-        "js/loot.js",
-        "js/shop.js",
-        "js/ui.js",
-        "js/game.js"
+      const VERSION = "1.0.19.2";
+      const SCRIPT_FILES = [
+        "loader.js",
+        "specialization.js",
+        "projectile.js",
+        "player.js",
+        "enemy.js",
+        "room.js",
+        "artifact.js",
+        "consumables.js",
+        "permanent_tools.js",
+        "loot.js",
+        "shop.js",
+        "ui.js",
+        "game.js"
       ];
 
-      const loadedScripts = [];
-      const failedScripts = [];
-      let scriptsReady = false;
+      /*
+        Why so many path options?
+        Your local boot log showed every js/*.js file failing. That means the files are
+        not in the folder index.html was looking at. This loader probes common project
+        layouts without needing you to guess the exact relative path first.
+
+        Works for these common layouts:
+        1. The-Lab/src/index.html + The-Lab/src/js/game.js
+        2. The-Lab/index.html + The-Lab/src/js/game.js
+        3. The-Lab/src/index.html + The-Lab/src/game.js
+        4. The-Lab/index.html + The-Lab/js/game.js
+        5. All files sitting beside index.html
+      */
+      const SCRIPT_PREFIXES = [
+        "js/",
+        "./js/",
+        "src/js/",
+        "./src/js/",
+        "../src/js/",
+        "../js/",
+        "",
+        "./",
+        "src/",
+        "./src/",
+        "../src/"
+      ];
+
+      const STYLESHEET_CANDIDATES = [
+        "style.css",
+        "./style.css",
+        "src/style.css",
+        "./src/style.css",
+        "../src/style.css",
+        "../style.css"
+      ];
+
+      const state = {
+        loadedScripts: [],
+        failedScripts: [],
+        scriptMap: {},
+        styleUrl: null,
+        ready: false,
+        started: false
+      };
 
       function byId(id) {
         return document.getElementById(id);
       }
 
-      function setText(id, text) {
-        const node = byId(id);
-        if (node) {
-          node.textContent = text;
+      function timestamp() {
+        return new Date().toLocaleTimeString();
+      }
+
+      function log(message, type) {
+        const bootLog = byId("bootLog");
+        const line = "[" + timestamp() + "] " + message;
+
+        if (bootLog) {
+          const div = document.createElement("div");
+          div.textContent = line;
+
+          if (type === "good") {
+            div.className = "log-good";
+          } else if (type === "bad") {
+            div.className = "log-bad";
+          } else if (type === "warn") {
+            div.className = "log-warn";
+          }
+
+          bootLog.appendChild(div);
+          bootLog.scrollTop = bootLog.scrollHeight;
+        }
+
+        if (type === "bad") {
+          console.error("[The Lab Loader] " + message);
+        } else if (type === "warn") {
+          console.warn("[The Lab Loader] " + message);
+        } else {
+          console.log("[The Lab Loader] " + message);
         }
       }
 
-      function appendBootLog(message) {
-        const log = byId("boot-log");
-        const line = `[${new Date().toLocaleTimeString()}] ${message}`;
-        console.log(`[The Lab ${THE_LAB_VERSION}] ${message}`);
-
-        if (log) {
-          log.textContent += `${line}\n`;
+      function setStartStatus(message) {
+        const el = byId("startStatus");
+        if (el) {
+          el.textContent = message;
         }
       }
 
-      function setBootStatus(message) {
-        setText("boot-status", message);
-        setText("game-message", message);
-      }
-
-      function showGameScreen() {
-        const startScreen = byId("start-screen");
-        const gameScreen = byId("game-screen");
-
-        if (startScreen) {
-          startScreen.classList.remove("is-active");
-        }
-
-        if (gameScreen) {
-          gameScreen.classList.add("is-active");
+      function setHudValue(id, value) {
+        const el = byId(id);
+        if (el) {
+          el.textContent = String(value);
         }
       }
 
-      function loadScript(path) {
+      function hideStartScreen() {
+        const screen = byId("startScreen");
+        if (screen) {
+          screen.classList.add("hidden");
+        }
+      }
+
+      function showStartScreen() {
+        const screen = byId("startScreen");
+        if (screen) {
+          screen.classList.remove("hidden");
+        }
+      }
+
+      function removeExistingStylesheetLinks() {
+        const links = Array.from(document.querySelectorAll("link[data-lab-stylesheet='true']"));
+        for (const link of links) {
+          link.remove();
+        }
+      }
+
+      function tryLoadStylesheet(url) {
         return new Promise((resolve) => {
-          const script = document.createElement("script");
-          script.src = path;
-          script.async = false;
+          const link = document.createElement("link");
+          let settled = false;
 
-          script.onload = function () {
-            loadedScripts.push(path);
-            appendBootLog(`Loaded ${path}`);
-            resolve(true);
+          link.rel = "stylesheet";
+          link.href = url;
+          link.dataset.labStylesheet = "true";
+
+          const done = (success) => {
+            if (settled) {
+              return;
+            }
+
+            settled = true;
+            resolve(success);
           };
 
-          script.onerror = function () {
-            failedScripts.push(path);
-            appendBootLog(`FAILED ${path}`);
-            resolve(false);
+          link.onload = () => done(true);
+          link.onerror = () => {
+            link.remove();
+            done(false);
           };
 
-          document.body.appendChild(script);
+          document.head.appendChild(link);
+
+          window.setTimeout(() => {
+            /*
+              Some file:// stylesheet loads do not reliably fire onload in all browsers.
+              If it did not error quickly, allow it and keep going.
+            */
+            done(true);
+          }, 450);
         });
       }
 
-      async function loadGameScripts() {
-        appendBootLog("Starting ordered script load from src/index.html.");
+      async function loadFirstWorkingStylesheet() {
+        removeExistingStylesheetLinks();
 
-        for (const path of SCRIPT_PATHS) {
-          await loadScript(path);
+        for (const url of STYLESHEET_CANDIDATES) {
+          const ok = await tryLoadStylesheet(url);
+          if (ok) {
+            state.styleUrl = url;
+            log("Stylesheet candidate accepted: " + url, "good");
+            return url;
+          }
+
+          log("Stylesheet candidate failed: " + url, "warn");
         }
 
-        scriptsReady = true;
+        log("No external stylesheet loaded. Internal fallback styles are active.", "warn");
+        return null;
+      }
 
-        if (failedScripts.length > 0) {
-          setBootStatus(`Some files failed to load: ${failedScripts.join(", ")}`);
-          appendBootLog(`FAILED: ${failedScripts.join(", ")}`);
+      function tryLoadScript(url) {
+        return new Promise((resolve) => {
+          const script = document.createElement("script");
+          let settled = false;
+
+          script.src = url;
+          script.async = false;
+
+          const done = (success) => {
+            if (settled) {
+              return;
+            }
+
+            settled = true;
+            if (!success && script.parentNode) {
+              script.parentNode.removeChild(script);
+            }
+            resolve(success);
+          };
+
+          script.onload = () => done(true);
+          script.onerror = () => done(false);
+
+          document.head.appendChild(script);
+        });
+      }
+
+      async function loadScriptFromCandidates(fileName) {
+        for (const prefix of SCRIPT_PREFIXES) {
+          const url = prefix + fileName;
+          const ok = await tryLoadScript(url);
+
+          if (ok) {
+            state.loadedScripts.push(fileName);
+            state.scriptMap[fileName] = url;
+            log("Loaded " + fileName + " from " + url, "good");
+            return url;
+          }
+        }
+
+        state.failedScripts.push(fileName);
+        log("FAILED " + fileName + " from all candidate paths.", "bad");
+        return null;
+      }
+
+      async function loadScriptsInOrder() {
+        log("Starting ordered script probe. Loader version " + VERSION + ".");
+
+        for (const fileName of SCRIPT_FILES) {
+          await loadScriptFromCandidates(fileName);
+        }
+
+        if (state.failedScripts.length > 0) {
+          log("Missing scripts: " + state.failedScripts.join(", "), "bad");
         } else {
-          setBootStatus("Ready. Click Start Run to begin.");
-          appendBootLog("All scripts loaded successfully.");
+          log("All scripts loaded.", "good");
+        }
+
+        logExposedApis();
+        state.ready = true;
+        setStartStatus(getReadyStatusMessage());
+      }
+
+      function logExposedApis() {
+        const exposed = [];
+
+        const names = [
+          "Game",
+          "game",
+          "LabGame",
+          "TheLabGame",
+          "GameManager",
+          "gameManager",
+          "startGame",
+          "startLab",
+          "initGame",
+          "initLab",
+          "main",
+          "GameLoader",
+          "Player",
+          "ProjectileSystem",
+          "UIManager"
+        ];
+
+        for (const name of names) {
+          if (window[name]) {
+            exposed.push(name);
+          }
+        }
+
+        if (exposed.length > 0) {
+          log("Detected browser globals: " + exposed.join(", "), "good");
+        } else {
+          log("No expected game globals detected yet.", "warn");
         }
       }
 
-      function callStartApi() {
-        const canvas = byId("gameCanvas");
-        const playerName = (byId("player-name") && byId("player-name").value) || "Student";
+      function getCanvas() {
+        return byId("gameCanvas") || document.querySelector("canvas");
+      }
 
+      function getGameOptions() {
+        return {
+          canvas: getCanvas(),
+          canvasId: "gameCanvas",
+          root: byId("app"),
+          hud: byId("hud"),
+          startScreen: byId("startScreen"),
+          startButton: byId("startButton"),
+          bootLog: byId("bootLog")
+        };
+      }
+
+      function getReadyStatusMessage() {
+        if (state.failedScripts.length > 0) {
+          return "Some scripts are missing. Check the boot log.";
+        }
+
+        return "Files loaded. Press Start Run.";
+      }
+
+      function isCallable(value) {
+        return typeof value === "function";
+      }
+
+      function callSafely(label, fn) {
         try {
-          if (window.game && typeof window.game.start === "function") {
-            window.game.start({ canvas, playerName });
-            return true;
-          }
-
-          if (window.game && typeof window.game.startGame === "function") {
-            window.game.startGame({ canvas, playerName });
-            return true;
-          }
-
-          if (window.Game && typeof window.Game === "function") {
-            if (!window.game) {
-              window.game = new window.Game({ canvas, playerName });
-            }
-
-            if (typeof window.game.start === "function") {
-              window.game.start({ canvas, playerName });
-              return true;
-            }
-
-            if (typeof window.game.init === "function") {
-              window.game.init({ canvas, playerName });
-              return true;
-            }
-
-            return true;
-          }
-
-          if (window.GameLoader && typeof window.GameLoader === "function") {
-            if (!window.gameLoader) {
-              window.gameLoader = new window.GameLoader({ canvas, playerName });
-            }
-
-            if (typeof window.gameLoader.start === "function") {
-              window.gameLoader.start();
-              return true;
-            }
-
-            if (typeof window.gameLoader.init === "function") {
-              window.gameLoader.init();
-              return true;
-            }
-
-            return true;
-          }
+          const result = fn();
+          log("Started with " + label + ".", "good");
+          return {
+            ok: true,
+            result: result
+          };
         } catch (error) {
-          console.error("[The Lab] Start failed:", error);
-          setBootStatus("Start failed. Check the first red Console error.");
-          appendBootLog(`ERROR: ${error.message}`);
-          return false;
+          log(label + " threw: " + (error && error.message ? error.message : error), "bad");
+          return {
+            ok: false,
+            result: null
+          };
+        }
+      }
+
+      function tryKnownStartApis() {
+        const options = getGameOptions();
+
+        const candidates = [
+          {
+            label: "window.startGame(options)",
+            test: () => isCallable(window.startGame),
+            run: () => window.startGame(options)
+          },
+          {
+            label: "window.startLab(options)",
+            test: () => isCallable(window.startLab),
+            run: () => window.startLab(options)
+          },
+          {
+            label: "window.initGame(options)",
+            test: () => isCallable(window.initGame),
+            run: () => window.initGame(options)
+          },
+          {
+            label: "window.initLab(options)",
+            test: () => isCallable(window.initLab),
+            run: () => window.initLab(options)
+          },
+          {
+            label: "window.main(options)",
+            test: () => isCallable(window.main),
+            run: () => window.main(options)
+          },
+          {
+            label: "window.game.start(options)",
+            test: () => window.game && isCallable(window.game.start),
+            run: () => window.game.start(options)
+          },
+          {
+            label: "window.game.init(options)",
+            test: () => window.game && isCallable(window.game.init),
+            run: () => window.game.init(options)
+          },
+          {
+            label: "window.game.run(options)",
+            test: () => window.game && isCallable(window.game.run),
+            run: () => window.game.run(options)
+          },
+          {
+            label: "window.Game.start(options)",
+            test: () => window.Game && isCallable(window.Game.start),
+            run: () => window.Game.start(options)
+          },
+          {
+            label: "new window.Game(options).start()",
+            test: () => isCallable(window.Game),
+            run: () => {
+              window.game = new window.Game(options);
+              if (window.game && isCallable(window.game.start)) {
+                return window.game.start(options);
+              }
+              if (window.game && isCallable(window.game.init)) {
+                return window.game.init(options);
+              }
+              return window.game;
+            }
+          },
+          {
+            label: "new window.LabGame(options).start()",
+            test: () => isCallable(window.LabGame),
+            run: () => {
+              window.game = new window.LabGame(options);
+              if (window.game && isCallable(window.game.start)) {
+                return window.game.start(options);
+              }
+              if (window.game && isCallable(window.game.init)) {
+                return window.game.init(options);
+              }
+              return window.game;
+            }
+          },
+          {
+            label: "new window.TheLabGame(options).start()",
+            test: () => isCallable(window.TheLabGame),
+            run: () => {
+              window.game = new window.TheLabGame(options);
+              if (window.game && isCallable(window.game.start)) {
+                return window.game.start(options);
+              }
+              if (window.game && isCallable(window.game.init)) {
+                return window.game.init(options);
+              }
+              return window.game;
+            }
+          },
+          {
+            label: "new window.GameManager(options).start()",
+            test: () => isCallable(window.GameManager),
+            run: () => {
+              window.game = new window.GameManager(options);
+              if (window.game && isCallable(window.game.start)) {
+                return window.game.start(options);
+              }
+              if (window.game && isCallable(window.game.init)) {
+                return window.game.init(options);
+              }
+              return window.game;
+            }
+          },
+          {
+            label: "window.GameLoader.start(options)",
+            test: () => window.GameLoader && isCallable(window.GameLoader.start),
+            run: () => window.GameLoader.start(options)
+          },
+          {
+            label: "new window.GameLoader(options).start()",
+            test: () => isCallable(window.GameLoader),
+            run: () => {
+              window.loader = new window.GameLoader(options);
+              if (window.loader && isCallable(window.loader.start)) {
+                return window.loader.start(options);
+              }
+              if (window.loader && isCallable(window.loader.init)) {
+                return window.loader.init(options);
+              }
+              return window.loader;
+            }
+          }
+        ];
+
+        for (const candidate of candidates) {
+          if (!candidate.test()) {
+            continue;
+          }
+
+          const response = callSafely(candidate.label, candidate.run);
+          if (response.ok) {
+            return true;
+          }
         }
 
         return false;
       }
 
-      window.addEventListener("DOMContentLoaded", function () {
-        appendBootLog("DOMContentLoaded fired. Beginning initialization.");
+      function drawFallbackGame() {
+        const canvas = getCanvas();
+        const ctx = canvas ? canvas.getContext("2d") : null;
 
-        const startButton = byId("startButton");
-
-        if (!startButton) {
-          appendBootLog("ERROR: #startButton not found in DOM.");
-          setBootStatus("ERROR: Start button not found.");
+        if (!canvas || !ctx) {
+          log("Fallback draw failed: canvas not available.", "bad");
           return;
         }
 
-        loadGameScripts().then(() => {
-          startButton.addEventListener("click", function () {
-            appendBootLog("Start button clicked.");
-            showGameScreen();
-            const started = callStartApi();
+        let playerX = canvas.width / 2;
+        let playerY = canvas.height / 2;
+        const keys = {};
 
-            if (started) {
-              appendBootLog("Game start API called successfully.");
-              setBootStatus("Run started.");
-            } else {
-              appendBootLog("Game start failed: no compatible API found.");
-              setBootStatus("Screen opened, but no game start API was found. Check console.");
+        hideStartScreen();
+        state.started = true;
+
+        setHudValue("hpValue", 100);
+        setHudValue("goldValue", 0);
+        setHudValue("xpValue", 0);
+        setHudValue("floorValue", 1);
+
+        window.addEventListener("keydown", (event) => {
+          keys[event.code] = true;
+        });
+
+        window.addEventListener("keyup", (event) => {
+          keys[event.code] = false;
+        });
+
+        function frame() {
+          const speed = 4;
+
+          if (keys.ArrowLeft || keys.KeyA) {
+            playerX -= speed;
+          }
+          if (keys.ArrowRight || keys.KeyD) {
+            playerX += speed;
+          }
+          if (keys.ArrowUp || keys.KeyW) {
+            playerY -= speed;
+          }
+          if (keys.ArrowDown || keys.KeyS) {
+            playerY += speed;
+          }
+
+          playerX = Math.max(30, Math.min(canvas.width - 30, playerX));
+          playerY = Math.max(30, Math.min(canvas.height - 30, playerY));
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          ctx.fillStyle = "#020617";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          ctx.strokeStyle = "rgba(56, 189, 248, 0.22)";
+          ctx.lineWidth = 1;
+          for (let x = 0; x <= canvas.width; x += 40) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+          }
+          for (let y = 0; y <= canvas.height; y += 40) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+          }
+
+          ctx.fillStyle = "#22c55e";
+          ctx.fillRect(playerX - 14, playerY - 14, 28, 28);
+
+          ctx.strokeStyle = "#e5e7eb";
+          ctx.lineWidth = 3;
+          ctx.strokeRect(playerX - 14, playerY - 14, 28, 28);
+
+          ctx.fillStyle = "#e5e7eb";
+          ctx.font = "22px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("Fallback test mode", canvas.width / 2, 58);
+
+          ctx.fillStyle = "#94a3b8";
+          ctx.font = "16px system-ui, sans-serif";
+          ctx.fillText("Scripts still need to load for the real game. WASD / arrows move.", canvas.width / 2, 86);
+
+          requestAnimationFrame(frame);
+        }
+
+        log("Started fallback canvas mode. This confirms the button/canvas work, but real scripts are still missing.", "warn");
+        requestAnimationFrame(frame);
+      }
+
+      function handleStartClick() {
+        log("Start button clicked.");
+
+        if (!state.ready) {
+          log("Start clicked before script probe finished.", "warn");
+          setStartStatus("Still checking local files...");
+          return;
+        }
+
+        if (state.started) {
+          log("Start ignored because the game is already running.", "warn");
+          return;
+        }
+
+        if (state.failedScripts.length > 0) {
+          setStartStatus("Scripts are missing. Check the boot log.");
+          log("Cannot start real game because required scripts failed to load.", "bad");
+          drawFallbackGame();
+          return;
+        }
+
+        const started = tryKnownStartApis();
+
+        if (started) {
+          state.started = true;
+          hideStartScreen();
+          setStartStatus("Started.");
+          return;
+        }
+
+        setStartStatus("Files loaded, but no game start API was found.");
+        log("Game start failed: no compatible API found after scripts loaded.", "bad");
+        drawFallbackGame();
+      }
+
+      function wireButtons() {
+        const startButton = byId("startButton");
+        if (startButton) {
+          startButton.addEventListener("click", handleStartClick);
+        }
+
+        const copyLogButton = byId("copyLogButton");
+        if (copyLogButton) {
+          copyLogButton.addEventListener("click", async () => {
+            const bootLog = byId("bootLog");
+            const text = bootLog ? bootLog.innerText : "";
+
+            try {
+              await navigator.clipboard.writeText(text);
+              log("Boot log copied.", "good");
+            } catch (error) {
+              log("Could not copy boot log automatically. Select it manually.", "warn");
             }
           });
-        });
-      });
+        }
+      }
+
+      async function init() {
+        log("DOMContentLoaded fired. Beginning initialization.");
+        wireButtons();
+        showStartScreen();
+        setStartStatus("Checking stylesheet and scripts...");
+        await loadFirstWorkingStylesheet();
+        await loadScriptsInOrder();
+
+        if (state.failedScripts.length === 0) {
+          setStartStatus("Files loaded. Press Start Run.");
+        }
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+      } else {
+        init();
+      }
     })();
   </script>
 </body>

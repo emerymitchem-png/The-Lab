@@ -1,6 +1,6 @@
 /**
  * The Lab - Game Loop
- * Version: 1.0.21
+ * Version: 1.0.22
  *
  * File: src/js/game.js
  * Replacement: Replace the whole file
@@ -10,6 +10,7 @@
  * - Pass enemies/walls to player.update()
  * - Advance rooms/floors and handle victory/game over
  * - Keep H key damage test
+ * - Clean up duplicate HUD draw from v1.0.21
  *
  * TESTING CHECKLIST:
  * □ Start game, enter floor 1 room 1
@@ -22,12 +23,13 @@
  * □ Enemies are tougher on floor 2
  * □ Reaching floor 5, defeat final boss = victory screen
  * □ HP can reach 0 = game over screen
+ * □ HUD draws once and stays readable
  */
 
 (function () {
   "use strict";
 
-  const GAME_VERSION = "1.0.21";
+  const GAME_VERSION = "1.0.22";
   const MAX_FLOOR = 5;
   const ROOMS_PER_FLOOR = 13;
   const TARGET_FPS = 60;
@@ -210,6 +212,10 @@
       if (this.player.dead || this.player.isDead || this.player.health <= 0) {
         this.state = "gameOver";
         return;
+      }
+
+      if (!this.room.cleared && typeof this.room.getAliveEnemyCount === "function" && this.room.getAliveEnemyCount() <= 0) {
+        this.room.setRoomCleared();
       }
 
       if (this.room.cleared && this.room.isReadyForAdvance() && !this.roomAdvanceHandled) {

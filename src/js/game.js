@@ -1,500 +1,329 @@
-// game.js - Main game loop and state management
-// Version: 1.0.20.1 - HP and HUD Recovery
-// Purpose: Add damage feedback and HUD syncing
+/**
+ * The Lab - Game Loop
+ * Version: 1.0.21
+ *
+ * File: src/js/game.js
+ * Replacement: Replace the whole file
+ * Purpose:
+ * - Run the 60 FPS canvas loop
+ * - Create player and rooms
+ * - Pass enemies/walls to player.update()
+ * - Advance rooms/floors and handle victory/game over
+ * - Keep H key damage test
+ *
+ * TESTING CHECKLIST:
+ * □ Start game, enter floor 1 room 1
+ * □ 2-3 enemies should appear
+ * □ Move toward enemies (no collision should stop you)
+ * □ Shoot enemies (damage text appears)
+ * □ Enemies die and drop loot (gold/xp text appears)
+ * □ Room clears, advance to room 2
+ * □ After 13 rooms, advance to floor 2
+ * □ Enemies are tougher on floor 2
+ * □ Reaching floor 5, defeat final boss = victory screen
+ * □ HP can reach 0 = game over screen
+ */
 
-class Player {
-    constructor(x, y, canvas) {
-        this.x = x;
-        this.y = y;
-        this.canvas = canvas;
-        this.width = 20;
-        this.height = 20;
-        this.speed = 200; // pixels per second
-        this.health = 100;
-        this.maxHealth = 100;
-        this.gold = 0;
-        this.xp = 0;
-        this.floor = 1;
-        
-        // Damage feedback
-        this.damageFlash = 0;
-        this.floatingTexts = [];
-        
-        // Input state
-        this.keys = {};
-        this.mouse = { x: canvas.width / 2, y: canvas.height / 2 };
-        this.mouseDown = false;
-        
-        // Projectiles
-        this.projectiles = [];
-        this.fireRate = 0.15; // seconds between shots
-        this.lastFireTime = 0;
-        
-        this.setupInputListeners();
-    }
-    
-    setupInputListeners() {
-        window.addEventListener('keydown', (e) => {
-            this.keys[e.code] = true;
-            if (e.code === 'Space') e.preventDefault();
-            
-            // Debug: H key to test damage
-            if (e.code === 'KeyH') {
-                this.takeDamage(10);
-                console.log('🩹 Test damage applied: -10 HP');
-            }
-        });
-        
-        window.addEventListener('keyup', (e) => {
-            this.keys[e.code] = false;
-        });
-        
-        this.canvas.addEventListener('mousemove', (e) => {
-            const rect = this.canvas.getBoundingClientRect();
-            this.mouse.x = e.clientX - rect.left;
-            this.mouse.y = e.clientY - rect.top;
-        });
-        
-        this.canvas.addEventListener('mousedown', (e) => {
-            this.mouseDown = true;
-        });
-        
-        this.canvas.addEventListener('mouseup', (e) => {
-            this.mouseDown = false;
-        });
-    }
-    
-    takeDamage(amount) {
-        this.health = Math.max(0, this.health - amount);
-        this.damageFlash = 0.3; // seconds
-        this.floatingTexts.push({
-            x: this.x,
-            y: this.y - 20,
-            text: `-${amount}`,
-            life: 1.0,
-            maxLife: 1.0
-        });
-    }
-    
-    addGold(amount) {
-        this.gold += amount;
-        this.floatingTexts.push({
-            x: this.x,
-            y: this.y + 20,
-            text: `+${amount}g`,
-            life: 1.0,
-            maxLife: 1.0,
-            color: '#fbbf24'
-        });
-    }
-    
-    addXP(amount) {
-        this.xp += amount;
-        this.floatingTexts.push({
-            x: this.x + 20,
-            y: this.y,
-            text: `+${amount}xp`,
-            life: 1.0,
-            maxLife: 1.0,
-            color: '#60a5fa'
-        });
-    }
-    
-    update(dt) {
-        // Damage flash decay
-        this.damageFlash = Math.max(0, this.damageFlash - dt);
-        
-        // Update floating texts
-        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
-            this.floatingTexts[i].life -= dt;
-            this.floatingTexts[i].y -= 30 * dt; // Float upward
-            if (this.floatingTexts[i].life <= 0) {
-                this.floatingTexts.splice(i, 1);
-            }
-        }
-        
-        // Movement
-        let dx = 0, dy = 0;
-        
-        if (this.keys['KeyW'] || this.keys['ArrowUp']) dy -= 1;
-        if (this.keys['KeyS'] || this.keys['ArrowDown']) dy += 1;
-        if (this.keys['KeyA'] || this.keys['ArrowLeft']) dx -= 1;
-        if (this.keys['KeyD'] || this.keys['ArrowRight']) dx += 1;
-        
-        // Normalize diagonal movement
-        if (dx !== 0 && dy !== 0) {
-            dx *= 0.707; // 1/sqrt(2)
-            dy *= 0.707;
-        }
-        
-        this.x += dx * this.speed * dt;
-        this.y += dy * this.speed * dt;
-        
-        // Clamp to canvas
-        this.x = Math.max(this.width, Math.min(this.canvas.width - this.width, this.x));
-        this.y = Math.max(this.height, Math.min(this.canvas.height - this.height, this.y));
-        
-        // Auto-fire
-        if (this.mouseDown || this.keys['Space']) {
-            this.lastFireTime += dt;
-            if (this.lastFireTime >= this.fireRate) {
-                this.fire();
-                this.lastFireTime = 0;
-            }
-        } else {
-            this.lastFireTime = 0;
-        }
-        
-        // Update projectiles
-        for (let i = this.projectiles.length - 1; i >= 0; i--) {
-            const proj = this.projectiles[i];
-            proj.x += proj.vx * dt;
-            proj.y += proj.vy * dt;
-            
-            // Remove if off-screen
-            if (proj.x < 0 || proj.x > this.canvas.width || 
-                proj.y < 0 || proj.y > this.canvas.height) {
-                this.projectiles.splice(i, 1);
-            }
-        }
-    }
-    
-    fire() {
-        const dx = this.mouse.x - this.x;
-        const dy = this.mouse.y - this.y;
-        const len = Math.hypot(dx, dy) || 1;
-        
-        const speed = 400;
-        this.projectiles.push({
-            x: this.x,
-            y: this.y,
-            vx: (dx / len) * speed,
-            vy: (dy / len) * speed,
-            radius: 4
-        });
-    }
-    
-    draw(ctx) {
-        // Draw player with damage flash
-        if (this.damageFlash > 0) {
-            ctx.fillStyle = `rgba(239, 68, 68, ${this.damageFlash})`;
-            ctx.fillRect(this.x - this.width / 2 - 2, this.y - this.height / 2 - 2, this.width + 4, this.height + 4);
-        }
-        
-        ctx.fillStyle = '#22c55e';
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
-        
-        // Draw aim line
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.mouse.x, this.mouse.y);
-        ctx.stroke();
-        
-        // Draw projectiles
-        ctx.fillStyle = '#f97316';
-        for (const proj of this.projectiles) {
-            ctx.beginPath();
-            ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        // Draw floating texts
-        for (const text of this.floatingTexts) {
-            const alpha = text.life / text.maxLife;
-            ctx.fillStyle = text.color || '#ef4444';
-            ctx.globalAlpha = alpha;
-            ctx.font = 'bold 14px system-ui';
-            ctx.fillText(text.text, text.x, text.y);
-            ctx.globalAlpha = 1.0;
-        }
-    }
-    
-    drawHUD(ctx) {
-        // Canvas-based HUD (always visible)
-        ctx.fillStyle = '#e5e7eb';
-        ctx.font = '14px system-ui';
-        ctx.fillText(`HP: ${Math.max(0, this.health)}/${this.maxHealth}`, 10, 25);
-        ctx.fillText(`Gold: ${this.gold}`, 10, 45);
-        ctx.fillText(`XP: ${this.xp}`, 10, 65);
-        ctx.fillText(`Floor: ${this.floor}`, 10, 85);
-        ctx.fillText(`Projectiles: ${this.projectiles.length}`, 10, 105);
-        ctx.fillText(`Press H to test damage`, 10, this.canvas.height - 20);
-        
-        // Attempt DOM HUD sync
-        this.syncDOMHUD();
-    }
-    
-    syncDOMHUD() {
-        // Try common ID patterns
-        const hpIds = ['hpValue', 'hp', 'playerHp', 'health-value', 'healthValue'];
-        const goldIds = ['goldValue', 'gold', 'coinCount', 'coin', 'gold-value'];
-        const xpIds = ['xpValue', 'xp', 'experience', 'xp-value'];
-        const floorIds = ['floorValue', 'floor', 'floor-number', 'floor-value'];
-        
-        const tryUpdate = (ids, value) => {
-            for (const id of ids) {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.textContent = String(value);
-                    break;
-                }
-            }
-        };
-        
-        tryUpdate(hpIds, Math.max(0, this.health));
-        tryUpdate(goldIds, this.gold);
-        tryUpdate(xpIds, this.xp);
-        tryUpdate(floorIds, this.floor);
-    }
-}
+(function () {
+  "use strict";
 
-class SimpleEnemy {
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.width = 16;
-        this.height = 16;
-        this.health = 10;
-        this.maxHealth = 10;
-        this.speed = 80;
-        this.contactCooldown = 0;
-        this.contactDamage = 5;
-        this.contactCooldownMax = 0.5;
-    }
-    
-    update(dt, player) {
-        // Contact cooldown
-        this.contactCooldown = Math.max(0, this.contactCooldown - dt);
-        
-        // Move toward player
-        const dx = player.x - this.x;
-        const dy = player.y - this.y;
-        const len = Math.hypot(dx, dy) || 1;
-        
-        this.x += (dx / len) * this.speed * dt;
-        this.y += (dy / len) * this.speed * dt;
-        
-        // Check contact with player
-        const distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
-        if (distToPlayer < this.width / 2 + player.width / 2 && this.contactCooldown === 0) {
-            player.takeDamage(this.contactDamage);
-            this.contactCooldown = this.contactCooldownMax;
-            console.log('💥 Enemy hit player: -' + this.contactDamage + ' HP');
-        }
-    }
-    
-    draw(ctx) {
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
-        
-        // Health bar
-        ctx.fillStyle = '#22c55e';
-        const barWidth = 20;
-        const barHeight = 2;
-        const healthPercent = this.health / this.maxHealth;
-        ctx.fillRect(this.x - barWidth / 2, this.y - this.height / 2 - 6, barWidth * healthPercent, barHeight);
-    }
-}
+  const GAME_VERSION = "1.0.21";
+  const MAX_FLOOR = 5;
+  const ROOMS_PER_FLOOR = 13;
+  const TARGET_FPS = 60;
+  const FIXED_MAX_DT = 1 / 20;
 
-class Game {
-    constructor(canvas) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
-        
-        // Responsive canvas
-        this.resizeCanvas();
-        window.addEventListener('resize', () => this.resizeCanvas());
-        
-        this.player = new Player(this.canvas.width / 2, this.canvas.height / 2, this.canvas);
-        this.enemies = [];
-        this.gameState = 'playing';
-        this.time = 0;
-        this.spawnTimer = 0;
-        
-        // Spawn initial enemies
-        this.spawnEnemy();
-        
-        console.log('🎮 Render recovered — real canvas loop is active');
-        console.log('✅ HP and HUD recovery loaded');
-    }
-    
-    resizeCanvas() {
-        this.canvas.width = window.innerWidth - 20;
-        this.canvas.height = window.innerHeight - 20;
-    }
-    
-    spawnEnemy() {
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 150;
-        const x = this.canvas.width / 2 + Math.cos(angle) * distance;
-        const y = this.canvas.height / 2 + Math.sin(angle) * distance;
-        this.enemies.push(new SimpleEnemy(x, y));
-    }
-    
-    update(dt) {
-        this.player.update(dt);
-        
-        // Update enemies
-        for (let i = this.enemies.length - 1; i >= 0; i--) {
-            this.enemies[i].update(dt, this.player);
-        }
-        
-        // Check projectile-enemy collisions
-        for (let i = this.player.projectiles.length - 1; i >= 0; i--) {
-            const proj = this.player.projectiles[i];
-            
-            for (let j = this.enemies.length - 1; j >= 0; j--) {
-                const enemy = this.enemies[j];
-                const dx = proj.x - enemy.x;
-                const dy = proj.y - enemy.y;
-                const dist = Math.hypot(dx, dy);
-                
-                if (dist < proj.radius + enemy.width / 2) {
-                    enemy.health -= 10;
-                    this.player.projectiles.splice(i, 1);
-                    
-                    if (enemy.health <= 0) {
-                        this.player.addGold(10);
-                        this.player.addXP(25);
-                        this.enemies.splice(j, 1);
-                        console.log('⚔️ Enemy defeated: +10 gold, +25 xp');
-                    }
-                    break;
-                }
-            }
-        }
-        
-        // Spawn new enemies
-        this.spawnTimer += dt;
-        if (this.spawnTimer > 2 && this.enemies.length < 5) {
-            this.spawnEnemy();
-            this.spawnTimer = 0;
-        }
-        
-        // Game over check
-        if (this.player.health <= 0) {
-            this.gameState = 'gameover';
-            console.log('💀 Game Over! Final stats:', {
-                health: this.player.health,
-                gold: this.player.gold,
-                xp: this.player.xp
-            });
-        }
-        
-        this.time += dt;
-    }
-    
-    draw() {
-        // Clear canvas
-        this.ctx.fillStyle = '#020617';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Draw grid
-        this.ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)';
-        this.ctx.lineWidth = 1;
-        for (let x = 0; x < this.canvas.width; x += 40) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, this.canvas.height);
-            this.ctx.stroke();
-        }
-        for (let y = 0; y < this.canvas.height; y += 40) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(this.canvas.width, y);
-            this.ctx.stroke();
-        }
-        
-        // Draw game objects
-        this.player.draw(this.ctx);
-        
-        for (const enemy of this.enemies) {
-            enemy.draw(this.ctx);
-        }
-        
-        // Draw HUD
-        this.player.drawHUD(this.ctx);
-        
-        // Draw enemy count
-        this.ctx.fillStyle = '#f8fafc';
-        this.ctx.font = 'bold 16px system-ui';
-        this.ctx.fillText(`Enemies: ${this.enemies.length}`, this.canvas.width - 150, 30);
-        
-        // Draw game over screen
-        if (this.gameState === 'gameover') {
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-            
-            this.ctx.fillStyle = '#ef4444';
-            this.ctx.font = 'bold 48px system-ui';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 40);
-            
-            this.ctx.fillStyle = '#e5e7eb';
-            this.ctx.font = '18px system-ui';
-            this.ctx.fillText(`Gold: ${this.player.gold}`, this.canvas.width / 2, this.canvas.height / 2 + 20);
-            this.ctx.fillText(`XP: ${this.player.xp}`, this.canvas.width / 2, this.canvas.height / 2 + 50);
-            this.ctx.fillText('Refresh to play again', this.canvas.width / 2, this.canvas.height / 2 + 100);
-            this.ctx.textAlign = 'left';
-        }
-    }
-    
-    animate() {
-        const loop = (now) => {
-            const dt = Math.min(0.016, (now - (this.lastTime || now)) / 1000);
-            this.lastTime = now;
-            
-            if (this.gameState === 'playing') {
-                this.update(dt);
-            }
-            this.draw();
-            
-            requestAnimationFrame(loop);
-        };
-        
-        requestAnimationFrame(loop);
-    }
-}
+  function safeNumber(value, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
 
-// Global game instance
-let game = null;
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
 
-// Entry point - called by index.html
-function startGame(options) {
-    if (game) return; // Already running
-    
-    const canvas = options?.canvas || document.getElementById('gameCanvas');
+  function getCanvas() {
+    let canvas = document.getElementById("gameCanvas") || document.getElementById("canvas") || document.querySelector("canvas");
     if (!canvas) {
-        console.error('No canvas found');
-        return;
+      canvas = document.createElement("canvas");
+      canvas.id = "gameCanvas";
+      document.body.appendChild(canvas);
     }
-    
-    game = new Game(canvas);
-    game.animate();
-    
-    console.log('✅ Game started with HP and HUD recovery');
-}
+    canvas.width = safeNumber(canvas.width, 960) || 960;
+    canvas.height = safeNumber(canvas.height, 640) || 640;
+    canvas.style.imageRendering = "pixelated";
+    canvas.style.background = "#0f172a";
+    canvas.tabIndex = 0;
+    return canvas;
+  }
 
-// Expose global API
-window.startGame = startGame;
-window.game = null;
+  class LabGame {
+    constructor(options = {}) {
+      this.version = GAME_VERSION;
+      this.canvas = options.canvas || getCanvas();
+      this.ctx = this.canvas.getContext("2d");
 
-// Auto-start if invoked directly (for testing)
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        // Wait for other scripts to load
-        setTimeout(() => {
-            if (!window.game && document.getElementById('gameCanvas')) {
-                window.startGame({ canvas: document.getElementById('gameCanvas') });
-            }
-        }, 500);
-    });
-} else {
-    setTimeout(() => {
-        if (!window.game && document.getElementById('gameCanvas')) {
-            window.startGame({ canvas: document.getElementById('gameCanvas') });
+      this.width = this.canvas.width;
+      this.height = this.canvas.height;
+      this.camera = { x: 0, y: 0 };
+
+      this.floor = 1;
+      this.roomNumber = 1;
+      this.state = "playing";
+      this.lastTime = 0;
+      this.running = false;
+      this.roomAdvanceHandled = false;
+      this.message = "";
+      this.messageTimer = 0;
+
+      this.player = null;
+      this.room = null;
+      this.keys = {};
+
+      this.bindGlobalInput();
+      this.reset();
+    }
+
+    bindGlobalInput() {
+      if (this._globalInputBound) return;
+      this._globalInputBound = true;
+
+      window.addEventListener("keydown", (event) => {
+        this.keys[event.code] = true;
+
+        if (event.code === "KeyH") {
+          this.damageTest();
         }
-    }, 500);
-}
+
+        if (this.state !== "playing" && event.code === "Enter") {
+          this.reset();
+        }
+      });
+
+      window.addEventListener("keyup", (event) => {
+        this.keys[event.code] = false;
+      });
+
+      window.addEventListener("lab:enemyDefeated", (event) => {
+        const detail = event.detail || {};
+        if (detail.enemy && this.room && typeof this.room.addFeedback === "function") {
+          this.room.addFeedback(`+${detail.gold || 10} gold  +${detail.xp || 25} xp`, detail.enemy.x, detail.enemy.y - 34, "#facc15");
+        }
+      });
+    }
+
+    reset() {
+      if (!window.Player) {
+        throw new Error("Player class is missing. Make sure src/js/player.js loads before src/js/game.js.");
+      }
+      if (!window.Room) {
+        throw new Error("Room class is missing. Make sure src/js/room.js loads before src/js/game.js.");
+      }
+
+      this.floor = 1;
+      this.roomNumber = 1;
+      this.state = "playing";
+      this.message = "";
+      this.messageTimer = 0;
+      this.roomAdvanceHandled = false;
+
+      this.player = new window.Player(this.width / 2, this.height / 2, {
+        canvas: this.canvas,
+        inputTarget: window,
+        maxHealth: 100,
+        health: 100,
+        damage: 10,
+        speed: 185
+      });
+
+      this.loadRoom(this.floor, this.roomNumber);
+    }
+
+    loadRoom(floor, roomNumber) {
+      this.floor = clamp(safeNumber(floor, 1), 1, MAX_FLOOR);
+      this.roomNumber = clamp(safeNumber(roomNumber, 1), 1, ROOMS_PER_FLOOR);
+      this.room = new window.Room(this.floor, this.roomNumber, {
+        width: this.width,
+        height: this.height,
+        difficultyScale: this.getDifficultyScale(this.floor)
+      });
+
+      this.roomAdvanceHandled = false;
+      this.message = `Floor ${this.floor} - Room ${this.roomNumber}`;
+      this.messageTimer = 1.1;
+
+      if (this.player) {
+        this.player.x = this.width / 2;
+        this.player.y = this.height / 2;
+        this.player.projectiles = [];
+        this.player.setAim(this.player.x + 1, this.player.y);
+      }
+    }
+
+    getDifficultyScale(floor) {
+      const safeFloor = clamp(safeNumber(floor, 1), 1, MAX_FLOOR);
+      return 1 + ((safeFloor - 1) * 0.125);
+    }
+
+    start() {
+      if (this.running) return;
+      this.running = true;
+      this.lastTime = performance.now();
+      requestAnimationFrame((time) => this.loop(time));
+    }
+
+    loop(time) {
+      if (!this.running) return;
+
+      const rawDt = (time - this.lastTime) / 1000;
+      const dt = Math.min(FIXED_MAX_DT, Math.max(0, rawDt));
+      this.lastTime = time;
+
+      this.update(dt);
+      this.draw();
+      requestAnimationFrame((nextTime) => this.loop(nextTime));
+    }
+
+    update(dt) {
+      if (this.messageTimer > 0) {
+        this.messageTimer -= dt;
+      }
+
+      if (this.state !== "playing") {
+        return;
+      }
+
+      if (!this.player || !this.room) {
+        return;
+      }
+
+      this.room.update(dt, this.player);
+
+      this.player.update(dt, {
+        room: this.room,
+        enemies: this.room.enemies,
+        walls: this.room.walls,
+        floor: this.floor,
+        roomNumber: this.roomNumber
+      });
+
+      if (this.player.dead || this.player.isDead || this.player.health <= 0) {
+        this.state = "gameOver";
+        return;
+      }
+
+      if (this.room.cleared && this.room.isReadyForAdvance() && !this.roomAdvanceHandled) {
+        this.roomAdvanceHandled = true;
+        this.advanceRoomOrFloor();
+      }
+    }
+
+    advanceRoomOrFloor() {
+      if (this.floor === MAX_FLOOR && this.roomNumber === ROOMS_PER_FLOOR) {
+        this.state = "victory";
+        return;
+      }
+
+      if (this.roomNumber >= ROOMS_PER_FLOOR) {
+        this.floor += 1;
+        this.roomNumber = 1;
+      } else {
+        this.roomNumber += 1;
+      }
+
+      this.loadRoom(this.floor, this.roomNumber);
+    }
+
+    damageTest() {
+      if (!this.player || this.state !== "playing") return;
+      const dealt = this.player.takeDamage(10, { type: "debug_h_key" });
+      this.message = dealt > 0 ? `H test: -${dealt} HP` : "H test blocked by invulnerability";
+      this.messageTimer = 0.8;
+    }
+
+    draw() {
+      if (!this.ctx) return;
+
+      this.ctx.clearRect(0, 0, this.width, this.height);
+
+      if (this.room) {
+        this.room.draw(this.ctx, this.camera);
+      } else {
+        this.ctx.fillStyle = "#0f172a";
+        this.ctx.fillRect(0, 0, this.width, this.height);
+      }
+
+      if (this.player) {
+        this.player.draw(this.ctx, this.camera);
+      }
+
+      this.drawHUD();
+
+      if (this.state === "gameOver") {
+        this.drawEndScreen("GAME OVER", "Press Enter to restart", "#ef4444");
+      } else if (this.state === "victory") {
+        this.drawEndScreen("VICTORY!", "Floor 5 boss defeated. Press Enter to restart.", "#facc15");
+      }
+    }
+
+    drawHUD() {
+      const ctx = this.ctx;
+      const player = this.player || {};
+      const enemyCount = this.room ? this.room.getAliveEnemyCount() : 0;
+      const projectileCount = player.projectiles ? player.projectiles.length : 0;
+
+      ctx.save();
+      ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
+      ctx.fillRect(12, 12, 360, 116);
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(12, 12, 360, 116);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 16px monospace";
+      ctx.fillText(`The Lab v${GAME_VERSION}`, 28, 36);
+      ctx.font = "14px monospace";
+      ctx.fillText(`HP: ${Math.ceil(player.health ?? 0)} / ${Math.ceil(player.maxHealth ?? 100)}`, 28, 60);
+      ctx.fillText(`Gold: ${Math.floor(player.gold ?? 0)}    XP: ${Math.floor(player.xp ?? 0)}`, 28, 80);
+      ctx.fillText(`Floor: ${this.floor}    Room: ${this.roomNumber}/${ROOMS_PER_FLOOR}`, 28, 100);
+      ctx.fillText(`Enemies: ${enemyCount}    Projectiles: ${projectileCount}`, 28, 120);
+
+      if (this.messageTimer > 0 && this.message) {
+        ctx.textAlign = "center";
+        ctx.font = "bold 22px monospace";
+        ctx.fillStyle = "#facc15";
+        ctx.fillText(this.message, this.width / 2, 82);
+      }
+
+      ctx.restore();
+    }
+
+    drawEndScreen(title, subtitle, color) {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.fillStyle = "rgba(0, 0, 0, 0.72)";
+      ctx.fillRect(0, 0, this.width, this.height);
+      ctx.textAlign = "center";
+      ctx.fillStyle = color;
+      ctx.font = "bold 52px monospace";
+      ctx.fillText(title, this.width / 2, this.height / 2 - 30);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "20px monospace";
+      ctx.fillText(subtitle, this.width / 2, this.height / 2 + 14);
+      ctx.font = "16px monospace";
+      ctx.fillText(`Gold: ${Math.floor(this.player?.gold ?? 0)}   XP: ${Math.floor(this.player?.xp ?? 0)}`, this.width / 2, this.height / 2 + 50);
+      ctx.restore();
+    }
+  }
+
+  window.LabGame = LabGame;
+  window.TheLabGame = LabGame;
+
+  window.addEventListener("DOMContentLoaded", () => {
+    if (window.__THE_LAB_DISABLE_AUTO_START__) return;
+    if (window.game && window.game.version === GAME_VERSION) return;
+    const game = new LabGame();
+    window.game = game;
+    game.start();
+  });
+})();

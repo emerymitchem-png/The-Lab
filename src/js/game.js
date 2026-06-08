@@ -1,251 +1,342 @@
 // game.js - Main game loop and state management
+// Version: 1.0.20 - Render Recovery Game Loop
+// Purpose: Prove rendering and controls work before full roguelite integration
+
+class Player {
+    constructor(x, y, canvas) {
+        this.x = x;
+        this.y = y;
+        this.canvas = canvas;
+        this.width = 20;
+        this.height = 20;
+        this.speed = 200; // pixels per second
+        this.health = 100;
+        this.maxHealth = 100;
+        
+        // Input state
+        this.keys = {};
+        this.mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+        this.mouseDown = false;
+        
+        // Projectiles
+        this.projectiles = [];
+        this.fireRate = 0.15; // seconds between shots
+        this.lastFireTime = 0;
+        
+        this.setupInputListeners();
+    }
+    
+    setupInputListeners() {
+        window.addEventListener('keydown', (e) => {
+            this.keys[e.code] = true;
+            if (e.code === 'Space') e.preventDefault();
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            this.keys[e.code] = false;
+        });
+        
+        this.canvas.addEventListener('mousemove', (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            this.mouse.x = e.clientX - rect.left;
+            this.mouse.y = e.clientY - rect.top;
+        });
+        
+        this.canvas.addEventListener('mousedown', (e) => {
+            this.mouseDown = true;
+        });
+        
+        this.canvas.addEventListener('mouseup', (e) => {
+            this.mouseDown = false;
+        });
+    }
+    
+    update(dt) {
+        // Movement
+        let dx = 0, dy = 0;
+        
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) dy -= 1;
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) dy += 1;
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) dx -= 1;
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) dx += 1;
+        
+        // Normalize diagonal movement
+        if (dx !== 0 && dy !== 0) {
+            dx *= 0.707; // 1/sqrt(2)
+            dy *= 0.707;
+        }
+        
+        this.x += dx * this.speed * dt;
+        this.y += dy * this.speed * dt;
+        
+        // Clamp to canvas
+        this.x = Math.max(this.width, Math.min(this.canvas.width - this.width, this.x));
+        this.y = Math.max(this.height, Math.min(this.canvas.height - this.height, this.y));
+        
+        // Auto-fire
+        if (this.mouseDown || this.keys['Space']) {
+            this.lastFireTime += dt;
+            if (this.lastFireTime >= this.fireRate) {
+                this.fire();
+                this.lastFireTime = 0;
+            }
+        } else {
+            this.lastFireTime = 0;
+        }
+        
+        // Update projectiles
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const proj = this.projectiles[i];
+            proj.x += proj.vx * dt;
+            proj.y += proj.vy * dt;
+            
+            // Remove if off-screen
+            if (proj.x < 0 || proj.x > this.canvas.width || 
+                proj.y < 0 || proj.y > this.canvas.height) {
+                this.projectiles.splice(i, 1);
+            }
+        }
+    }
+    
+    fire() {
+        const dx = this.mouse.x - this.x;
+        const dy = this.mouse.y - this.y;
+        const len = Math.hypot(dx, dy) || 1;
+        
+        const speed = 400;
+        this.projectiles.push({
+            x: this.x,
+            y: this.y,
+            vx: (dx / len) * speed,
+            vy: (dy / len) * speed,
+            radius: 4
+        });
+    }
+    
+    draw(ctx) {
+        // Draw player
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        
+        // Draw aim line
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.mouse.x, this.mouse.y);
+        ctx.stroke();
+        
+        // Draw projectiles
+        ctx.fillStyle = '#f97316';
+        for (const proj of this.projectiles) {
+            ctx.beginPath();
+            ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Draw HUD
+        ctx.fillStyle = '#e5e7eb';
+        ctx.font = '14px system-ui';
+        ctx.fillText(`Health: ${this.health}/${this.maxHealth}`, 10, 20);
+        ctx.fillText(`Pos: ${Math.round(this.x)}, ${Math.round(this.y)}`, 10, 40);
+        ctx.fillText(`Projectiles: ${this.projectiles.length}`, 10, 60);
+    }
+}
+
+class SimpleEnemy {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 16;
+        this.height = 16;
+        this.health = 10;
+        this.maxHealth = 10;
+        this.speed = 80;
+    }
+    
+    update(dt, player) {
+        // Move toward player
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const len = Math.hypot(dx, dy) || 1;
+        
+        this.x += (dx / len) * this.speed * dt;
+        this.y += (dy / len) * this.speed * dt;
+    }
+    
+    draw(ctx) {
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        
+        // Health bar
+        ctx.fillStyle = '#22c55e';
+        const barWidth = 20;
+        const barHeight = 2;
+        const healthPercent = this.health / this.maxHealth;
+        ctx.fillRect(this.x - barWidth / 2, this.y - this.height / 2 - 6, barWidth * healthPercent, barHeight);
+    }
+}
 
 class Game {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.canvas.width = window.innerWidth - 10;
-        this.canvas.height = window.innerHeight - 10;
-
-        this.player = null;
-        this.currentFloor = 1;
-        this.currentRoom = 1;
-        this.currentRoomObject = null;
-        this.totalRoomsPerFloor = 13; // Will be updated based on floor
         
-        this.gameState = 'menu'; // menu, playing, paused, gameover
-        this.isPaused = false;
-        this.startTime = 0;
-        this.elapsedTime = 0;
+        // Responsive canvas
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
         
-        // Stats tracking
-        this.stats = {
-            floorsReached: 1,
-            roomsCleared: 0,
-            enemiesKilled: 0,
-            totalCoins: 0,
-            startTime: Date.now()
-        };
-
-        this.setupEventListeners();
-        this.gameLoop = this.update.bind(this);
-    }
-
-    setupEventListeners() {
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') this.togglePause();
-        });
-
-        window.addEventListener('resize', () => {
-            this.canvas.width = window.innerWidth - 10;
-            this.canvas.height = window.innerHeight - 10;
-        });
-    }
-
-    start() {
-        console.log("Game starting...");
+        this.player = new Player(this.canvas.width / 2, this.canvas.height / 2, this.canvas);
+        this.enemies = [];
         this.gameState = 'playing';
-        this.isPaused = false;
-        this.startTime = Date.now();
-        this.initializeGame();
-        this.animate(0);
+        this.time = 0;
+        this.spawnTimer = 0;
+        
+        // Spawn initial enemies
+        this.spawnEnemy();
+        
+        console.log('🎮 Render recovered — real canvas loop is active');
     }
-
-    initializeGame() {
-        // Initialize player
-        this.player = new Player(
-            this.canvas.width / 2,
-            this.canvas.height / 2,
-            this.canvas
-        );
-
-        // Generate first room
-        this.generateRoom();
+    
+    resizeCanvas() {
+        this.canvas.width = window.innerWidth - 20;
+        this.canvas.height = window.innerHeight - 20;
     }
-
-    generateRoom() {
-        const floorData = gameLoader.getFloorData(this.currentFloor);
-        this.totalRoomsPerFloor = floorData.total_rooms;
-
-        this.currentRoomObject = new Room(
-            this.currentFloor,
-            this.currentRoom,
-            this.totalRoomsPerFloor,
-            this.canvas
-        );
-
-        console.log(`Generated Floor ${this.currentFloor}, Room ${this.currentRoom}/${this.totalRoomsPerFloor}`);
+    
+    spawnEnemy() {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 150;
+        const x = this.canvas.width / 2 + Math.cos(angle) * distance;
+        const y = this.canvas.height / 2 + Math.sin(angle) * distance;
+        this.enemies.push(new SimpleEnemy(x, y));
     }
-
-    nextRoom() {
-        if (this.currentRoom < this.totalRoomsPerFloor) {
-            this.currentRoom++;
-            this.stats.roomsCleared++;
-            this.generateRoom();
-        } else {
-            this.nextFloor();
+    
+    update(dt) {
+        this.player.update(dt);
+        
+        // Update enemies
+        for (let i = this.enemies.length - 1; i >= 0; i--) {
+            this.enemies[i].update(dt, this.player);
         }
-    }
-
-    nextFloor() {
-        if (this.currentFloor < 5) {
-            this.currentFloor++;
-            this.currentRoom = 1;
-            this.stats.floorsReached = this.currentFloor;
-            this.generateRoom();
-        } else {
-            // Game victory!
-            this.victory();
-        }
-    }
-
-    update(deltaTime) {
-        if (this.gameState === 'menu') return;
-        if (this.isPaused) return;
-
-        // Update player
-        this.player.update(deltaTime);
-
-        // Update current room
-        if (this.currentRoomObject) {
-            this.currentRoomObject.update(deltaTime, this.player);
-
-            // Check if player died
-            if (this.player.health <= 0) {
-                this.gameOver();
-                return;
-            }
-
-            // Check if room is cleared
-            if (this.currentRoomObject.isCleared()) {
-                // Wait a moment before advancing
-                setTimeout(() => {
-                    if (this.gameState === 'playing') {
-                        this.nextRoom();
+        
+        // Check projectile-enemy collisions
+        for (let i = this.player.projectiles.length - 1; i >= 0; i--) {
+            const proj = this.player.projectiles[i];
+            
+            for (let j = this.enemies.length - 1; j >= 0; j--) {
+                const enemy = this.enemies[j];
+                const dx = proj.x - enemy.x;
+                const dy = proj.y - enemy.y;
+                const dist = Math.hypot(dx, dy);
+                
+                if (dist < proj.radius + enemy.width / 2) {
+                    enemy.health -= 10;
+                    this.player.projectiles.splice(i, 1);
+                    
+                    if (enemy.health <= 0) {
+                        this.enemies.splice(j, 1);
                     }
-                }, 500);
+                    break;
+                }
             }
         }
-
-        // Update HUD
-        uiManager.updateHUD(
-            this.player,
-            this.currentFloor,
-            this.currentRoom,
-            this.totalRoomsPerFloor
-        );
-
-        // Update elapsed time
-        this.elapsedTime = (Date.now() - this.startTime) / 1000;
+        
+        // Spawn new enemies
+        this.spawnTimer += dt;
+        if (this.spawnTimer > 2 && this.enemies.length < 5) {
+            this.spawnEnemy();
+            this.spawnTimer = 0;
+        }
+        
+        this.time += dt;
     }
-
+    
     draw() {
         // Clear canvas
-        this.ctx.fillStyle = '#0f1425';
+        this.ctx.fillStyle = '#020617';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Draw room
-        if (this.currentRoomObject) {
-            this.currentRoomObject.draw(this.ctx);
+        
+        // Draw grid
+        this.ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)';
+        this.ctx.lineWidth = 1;
+        for (let x = 0; x < this.canvas.width; x += 40) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, 0);
+            this.ctx.lineTo(x, this.canvas.height);
+            this.ctx.stroke();
         }
-
-        // Draw player
+        for (let y = 0; y < this.canvas.height; y += 40) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, y);
+            this.ctx.lineTo(this.canvas.width, y);
+            this.ctx.stroke();
+        }
+        
+        // Draw game objects
         this.player.draw(this.ctx);
-
-        // Draw debug info
-        this.drawDebugInfo();
-    }
-
-    drawDebugInfo() {
-        this.ctx.fillStyle = '#00ff00';
-        this.ctx.font = '10px Courier';
-        this.ctx.fillText(`FPS: ${Math.round(1000/16)}`, 10, this.canvas.height - 10);
-        this.ctx.fillText(`Player Pos: ${Math.round(this.player.x)}, ${Math.round(this.player.y)}`, 10, this.canvas.height - 20);
-        this.ctx.fillText(`Enemies: ${this.currentRoomObject.enemies.length}`, 10, this.canvas.height - 30);
-    }
-
-    togglePause() {
-        if (this.gameState === 'playing') {
-            this.isPaused = !this.isPaused;
-            if (this.isPaused) {
-                uiManager.showPauseMenu();
-            }
+        
+        for (const enemy of this.enemies) {
+            enemy.draw(this.ctx);
         }
+        
+        // Draw enemy count
+        this.ctx.fillStyle = '#f8fafc';
+        this.ctx.font = 'bold 16px system-ui';
+        this.ctx.fillText(`Enemies: ${this.enemies.length}`, this.canvas.width - 150, 30);
     }
-
-    gameOver() {
-        this.gameState = 'gameover';
-        this.stats.elapsedTime = this.elapsedTime;
-        uiManager.showGameOver(this.stats);
-        console.log("Game Over!", this.stats);
-    }
-
-    victory() {
-        this.gameState = 'victory';
-        alert("VICTORY! You defeated The Infinitum!");
-        this.gameOver();
-    }
-
-    animate(lastTime) {
-        const now = performance.now();
-        const deltaTime = Math.min((now - lastTime) / 1000, 0.016); // Cap at 60fps
-
-        this.update(deltaTime);
-        this.draw();
-
-        if (this.gameState !== 'menu' && this.gameState !== 'gameover') {
-            requestAnimationFrame((time) => this.animate(time));
-        }
+    
+    animate() {
+        const loop = (now) => {
+            const dt = Math.min(0.016, (now - (this.lastTime || now)) / 1000);
+            this.lastTime = now;
+            
+            this.update(dt);
+            this.draw();
+            
+            requestAnimationFrame(loop);
+        };
+        
+        requestAnimationFrame(loop);
     }
 }
 
-// Initialize game when document loads
+// Global game instance
 let game = null;
 
-window.addEventListener('DOMContentLoaded', async () => {
-    console.log("DOM loaded, loading game data...");
+// Entry point - called by index.html
+function startGame(options) {
+    if (game) return; // Already running
     
-    // Load all game data first
-    const dataLoaded = await gameLoader.loadAllData();
-    
-    if (!dataLoaded) {
-        console.error("Failed to load game data");
-        alert("Failed to load game data. Check console for errors.");
+    const canvas = options?.canvas || document.getElementById('gameCanvas');
+    if (!canvas) {
+        console.error('No canvas found');
         return;
     }
-
-    // Initialize game
-    const canvas = document.getElementById('gameCanvas');
+    
     game = new Game(canvas);
+    game.animate();
+    
+    console.log('✅ Game started with render recovery loop');
+}
 
-    // Handle start button
-    window.gameReady = false;
-    window.gameRunning = false;
-    window.gamePaused = false;
+// Expose global API
+window.startGame = startGame;
+window.game = null;
 
-    // Poll for start signal from UI
-    const checkForStart = setInterval(() => {
-        if (window.gameReady) {
-            window.gameReady = false;
-            window.gameRunning = true;
-            clearInterval(checkForStart);
-            game.start();
+// Auto-start if invoked directly (for testing)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        // Wait for other scripts to load
+        setTimeout(() => {
+            if (!window.game && document.getElementById('gameCanvas')) {
+                window.startGame({ canvas: document.getElementById('gameCanvas') });
+            }
+        }, 500);
+    });
+} else {
+    setTimeout(() => {
+        if (!window.game && document.getElementById('gameCanvas')) {
+            window.startGame({ canvas: document.getElementById('gameCanvas') });
         }
-    }, 100);
-
-    console.log("Game initialized and ready!");
-});
-
-// Handle pause signal from UI
-window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && window.gameRunning && game) {
-        if (window.gamePaused) {
-            window.gamePaused = false;
-            game.isPaused = false;
-        } else {
-            window.gamePaused = true;
-            game.isPaused = true;
-            uiManager.showPauseMenu();
-        }
-    }
-});
+    }, 500);
+}

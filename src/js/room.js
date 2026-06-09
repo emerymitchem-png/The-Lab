@@ -1,34 +1,7 @@
-/**
- * The Lab - Room System
- * Version: 1.0.23
- *
- * File: src/js/room.js
- * Replacement: Replace the whole file
- * Purpose:
- * - Generate procedural rooms for floors 1-5
- * - Add visible room barriers/obstacles that affect player, enemies, and projectiles
- * - Spawn enemies from docs/enemies.json through gameLoader when available
- * - Track room clear state, exit door state, enemy count, and reward state
- * - Draw room floor, walls, obstacles, exit door, enemies, and feedback text
- *
- * TESTING CHECKLIST:
- * □ Start game, enter floor 1 room 1
- * □ Room has outside walls and visible interior barriers
- * □ Player cannot walk through barriers
- * □ Enemies path around or slide along barriers
- * □ Projectiles hit barriers and despawn
- * □ 2-3 enemies should appear in normal rooms
- * □ Room clears when all enemies die
- * □ Exit door appears after room clear
- * □ Walking into exit advances to the next room
- * □ Shop rooms have no enemies and show an open exit
- * □ Boss room has a larger arena layout
- */
-
 (function () {
   "use strict";
 
-  const ROOM_VERSION = "1.0.23";
+  const ROOM_VERSION = "1.0.24";
   const DEFAULT_ROOM_WIDTH = 960;
   const DEFAULT_ROOM_HEIGHT = 640;
   const DEFAULT_WALL_THICKNESS = 36;
@@ -244,6 +217,7 @@
       this.feedbackTexts = [];
 
       this.exitDoor = this.generateExitDoor();
+      this.safeZones = this.generateSafeZones();
       this.walls = this.generateWalls();
       this.enemies = [];
       this.spawnEnemies(options.enemyData);
@@ -272,6 +246,66 @@
         type: "exit",
         open: false
       };
+    }
+
+    generateSafeZones() {
+      const spawn = this.getPlayerSpawnPoint("bottom");
+      const exit = this.exitDoor;
+      return [
+        {
+          x: spawn.x - 86,
+          y: spawn.y - 72,
+          width: 172,
+          height: 122,
+          type: "safe_spawn"
+        },
+        {
+          x: exit.x - 26,
+          y: 0,
+          width: exit.width + 52,
+          height: this.wallThickness + 96,
+          type: "safe_exit"
+        }
+      ];
+    }
+
+    getPlayerSpawnPoint(entrySide = "bottom") {
+      const margin = this.wallThickness + 48;
+      const bottomPoint = {
+        x: this.width / 2,
+        y: this.height - margin
+      };
+
+      const points = [
+        bottomPoint,
+        { x: this.width / 2 - 120, y: this.height - margin },
+        { x: this.width / 2 + 120, y: this.height - margin },
+        { x: this.width / 2, y: this.height - margin - 90 },
+        { x: this.width / 2 - 160, y: this.height - margin - 90 },
+        { x: this.width / 2 + 160, y: this.height - margin - 90 }
+      ];
+
+      if (entrySide === "top" || entrySide === "exit_door") {
+        points.unshift({ x: this.width / 2, y: this.wallThickness + 96 });
+      }
+
+      for (const point of points) {
+        const testRect = { x: point.x - 18, y: point.y - 18, width: 36, height: 36 };
+        if (!this.walls || !this.rectCollidesWithWalls(testRect)) {
+          return point;
+        }
+      }
+
+      return bottomPoint;
+    }
+
+    wallOverlapsSafeZone(wall) {
+      if (!Array.isArray(this.safeZones)) return false;
+      return this.safeZones.some((zone) => rectsOverlap(wall, zone));
+    }
+
+    filterUnsafeObstacles(obstacles) {
+      return obstacles.filter((obstacle) => !this.wallOverlapsSafeZone(obstacle));
     }
 
     generateWalls() {
@@ -306,7 +340,9 @@
         walls.push(...this.makeScatteredObstacles());
       }
 
-      return walls;
+      const boundaryWalls = walls.filter((wall) => wall.type === "wall");
+      const obstacles = walls.filter((wall) => wall.type !== "wall");
+      return boundaryWalls.concat(this.filterUnsafeObstacles(obstacles));
     }
 
     getLayoutName() {

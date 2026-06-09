@@ -1,35 +1,7 @@
-/**
- * The Lab - Game Loop
- * Version: 1.0.23
- *
- * File: src/js/game.js
- * Replacement: Replace the whole file
- * Purpose:
- * - Run the 60 FPS canvas loop
- * - Create player and rooms
- * - Pass enemies/walls to player.update()
- * - Advance rooms/floors through visible exit doors instead of instant auto-advance
- * - Draw floor minimap / room progress strip
- * - Handle victory/game over
- * - Keep H key damage test
- *
- * TESTING CHECKLIST:
- * □ Start game, enter floor 1 room 1
- * □ Room has visible barriers
- * □ Player/enemies/projectiles collide with barriers
- * □ Enemies die and room clear text appears
- * □ Exit door opens after room clear
- * □ Walking into exit advances to the next room
- * □ Minimap marks current and cleared rooms
- * □ After 13 rooms, advance to floor 2
- * □ Reaching floor 5, defeat final boss and use exit = victory screen
- * □ HP can reach 0 = game over screen
- */
-
 (function () {
   "use strict";
 
-  const GAME_VERSION = "1.0.23";
+  const GAME_VERSION = "1.0.24";
   const MAX_FLOOR = 5;
   const ROOMS_PER_FLOOR = 13;
   const FIXED_MAX_DT = 1 / 20;
@@ -184,16 +156,15 @@
     placePlayerForRoomEntry(entrySide) {
       const margin = this.room ? this.room.wallThickness + 48 : 84;
 
-      if (entrySide === "exit") {
-        this.player.x = this.width / 2;
-        this.player.y = this.height - margin;
-      } else if (entrySide === "start") {
-        this.player.x = this.width / 2;
-        this.player.y = this.height / 2;
-      } else {
-        this.player.x = this.width / 2;
-        this.player.y = this.height - margin;
+      if (this.room && typeof this.room.getPlayerSpawnPoint === "function") {
+        const spawn = this.room.getPlayerSpawnPoint(entrySide === "exit" ? "bottom" : entrySide);
+        this.player.x = spawn.x;
+        this.player.y = spawn.y;
+        return;
       }
+
+      this.player.x = this.width / 2;
+      this.player.y = this.height - margin;
     }
 
     getDifficultyScale(floor) {

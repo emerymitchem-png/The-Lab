@@ -1,6 +1,6 @@
 /**
  * The Lab - Game Loop
- * Version: 1.0.22
+ * Version: 1.0.23
  *
  * File: src/js/game.js
  * Replacement: Replace the whole file
@@ -8,31 +8,30 @@
  * - Run the 60 FPS canvas loop
  * - Create player and rooms
  * - Pass enemies/walls to player.update()
- * - Advance rooms/floors and handle victory/game over
+ * - Advance rooms/floors through visible exit doors instead of instant auto-advance
+ * - Draw floor minimap / room progress strip
+ * - Handle victory/game over
  * - Keep H key damage test
- * - Clean up duplicate HUD draw from v1.0.21
  *
  * TESTING CHECKLIST:
  * □ Start game, enter floor 1 room 1
- * □ 2-3 enemies should appear
- * □ Move toward enemies (no collision should stop you)
- * □ Shoot enemies (damage text appears)
- * □ Enemies die and drop loot (gold/xp text appears)
- * □ Room clears, advance to room 2
+ * □ Room has visible barriers
+ * □ Player/enemies/projectiles collide with barriers
+ * □ Enemies die and room clear text appears
+ * □ Exit door opens after room clear
+ * □ Walking into exit advances to the next room
+ * □ Minimap marks current and cleared rooms
  * □ After 13 rooms, advance to floor 2
- * □ Enemies are tougher on floor 2
- * □ Reaching floor 5, defeat final boss = victory screen
+ * □ Reaching floor 5, defeat final boss and use exit = victory screen
  * □ HP can reach 0 = game over screen
- * □ HUD draws once and stays readable
  */
 
 (function () {
   "use strict";
 
-  const GAME_VERSION = "1.0.22";
+  const GAME_VERSION = "1.0.23";
   const MAX_FLOOR = 5;
   const ROOMS_PER_FLOOR = 13;
-  const TARGET_FPS = 60;
   const FIXED_MAX_DT = 1 / 20;
 
   function safeNumber(value, fallback) {
@@ -74,13 +73,14 @@
       this.state = "playing";
       this.lastTime = 0;
       this.running = false;
-      this.roomAdvanceHandled = false;
       this.message = "";
       this.messageTimer = 0;
+      this.exitCooldown = 0;
 
       this.player = null;
       this.room = null;
       this.keys = {};
+      this.floorProgress = {};
 
       this.bindGlobalInput();
       this.reset();
@@ -127,7 +127,8 @@
       this.state = "playing";
       this.message = "";
       this.messageTimer = 0;
-      this.roomAdvanceHandled = false;
+      this.exitCooldown = 0;
+      this.floorProgress = {};
 
       this.player = new window.Player(this.width / 2, this.height / 2, {
         canvas: this.canvas,
@@ -138,10 +139,26 @@
         speed: 185
       });
 
-      this.loadRoom(this.floor, this.roomNumber);
+      this.loadRoom(this.floor, this.roomNumber, "start");
+      this.canvas.focus();
     }
 
-    loadRoom(floor, roomNumber) {
+    getFloorKey(floor = this.floor) {
+      return `floor_${floor}`;
+    }
+
+    ensureFloorProgress(floor = this.floor) {
+      const key = this.getFloorKey(floor);
+      if (!this.floorProgress[key]) {
+        this.floorProgress[key] = {
+          clearedRooms: {},
+          visitedRooms: {}
+        };
+      }
+      return this.floorProgress[key];
+    }
+
+    loadRoom(floor, roomNumber, entrySide = "bottom") {
       this.floor = clamp(safeNumber(floor, 1), 1, MAX_FLOOR);
       this.roomNumber = clamp(safeNumber(roomNumber, 1), 1, ROOMS_PER_FLOOR);
       this.room = new window.Room(this.floor, this.roomNumber, {
@@ -150,15 +167,32 @@
         difficultyScale: this.getDifficultyScale(this.floor)
       });
 
-      this.roomAdvanceHandled = false;
+      const progress = this.ensureFloorProgress(this.floor);
+      progress.visitedRooms[this.roomNumber] = true;
+
       this.message = `Floor ${this.floor} - Room ${this.roomNumber}`;
       this.messageTimer = 1.1;
+      this.exitCooldown = 0.25;
 
       if (this.player) {
-        this.player.x = this.width / 2;
-        this.player.y = this.height / 2;
+        this.placePlayerForRoomEntry(entrySide);
         this.player.projectiles = [];
         this.player.setAim(this.player.x + 1, this.player.y);
+      }
+    }
+
+    placePlayerForRoomEntry(entrySide) {
+      const margin = this.room ? this.room.wallThickness + 48 : 84;
+
+      if (entrySide === "exit") {
+        this.player.x = this.width / 2;
+        this.player.y = this.height - margin;
+      } else if (entrySide === "start") {
+        this.player.x = this.width / 2;
+        this.player.y = this.height / 2;
+      } else {
+        this.player.x = this.width / 2;
+        this.player.y = this.height - margin;
       }
     }
 
@@ -190,6 +224,9 @@
       if (this.messageTimer > 0) {
         this.messageTimer -= dt;
       }
+      if (this.exitCooldown > 0) {
+        this.exitCooldown -= dt;
+      }
 
       if (this.state !== "playing") {
         return;
@@ -218,8 +255,13 @@
         this.room.setRoomCleared();
       }
 
-      if (this.room.cleared && this.room.isReadyForAdvance() && !this.roomAdvanceHandled) {
-        this.roomAdvanceHandled = true;
+      if (this.room.cleared) {
+        const progress = this.ensureFloorProgress(this.floor);
+        progress.clearedRooms[this.roomNumber] = true;
+      }
+
+      if (this.room.playerTouchesExit(this.player) && this.exitCooldown <= 0) {
+        this.room.markExitUsed();
         this.advanceRoomOrFloor();
       }
     }
@@ -237,7 +279,7 @@
         this.roomNumber += 1;
       }
 
-      this.loadRoom(this.floor, this.roomNumber);
+      this.loadRoom(this.floor, this.roomNumber, "exit");
     }
 
     damageTest() {
@@ -264,6 +306,7 @@
       }
 
       this.drawHUD();
+      this.drawFloorMap();
 
       if (this.state === "gameOver") {
         this.drawEndScreen("GAME OVER", "Press Enter to restart", "#ef4444");
@@ -277,13 +320,15 @@
       const player = this.player || {};
       const enemyCount = this.room ? this.room.getAliveEnemyCount() : 0;
       const projectileCount = player.projectiles ? player.projectiles.length : 0;
+      const roomType = this.room ? this.room.type : "normal";
+      const exitText = this.room && this.room.exitOpen ? "OPEN" : "LOCKED";
 
       ctx.save();
       ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
-      ctx.fillRect(12, 12, 360, 116);
+      ctx.fillRect(12, 12, 392, 140);
       ctx.strokeStyle = "#475569";
       ctx.lineWidth = 2;
-      ctx.strokeRect(12, 12, 360, 116);
+      ctx.strokeRect(12, 12, 392, 140);
 
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 16px monospace";
@@ -292,13 +337,70 @@
       ctx.fillText(`HP: ${Math.ceil(player.health ?? 0)} / ${Math.ceil(player.maxHealth ?? 100)}`, 28, 60);
       ctx.fillText(`Gold: ${Math.floor(player.gold ?? 0)}    XP: ${Math.floor(player.xp ?? 0)}`, 28, 80);
       ctx.fillText(`Floor: ${this.floor}    Room: ${this.roomNumber}/${ROOMS_PER_FLOOR}`, 28, 100);
-      ctx.fillText(`Enemies: ${enemyCount}    Projectiles: ${projectileCount}`, 28, 120);
+      ctx.fillText(`Type: ${roomType.toUpperCase()}    Exit: ${exitText}`, 28, 120);
+      ctx.fillText(`Enemies: ${enemyCount}    Projectiles: ${projectileCount}`, 28, 140);
 
       if (this.messageTimer > 0 && this.message) {
         ctx.textAlign = "center";
         ctx.font = "bold 22px monospace";
         ctx.fillStyle = "#facc15";
         ctx.fillText(this.message, this.width / 2, 82);
+      }
+
+      ctx.restore();
+    }
+
+    drawFloorMap() {
+      const ctx = this.ctx;
+      const progress = this.ensureFloorProgress(this.floor);
+      const startX = this.width - 342;
+      const startY = 18;
+      const cell = 22;
+      const gap = 6;
+
+      ctx.save();
+      ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
+      ctx.fillRect(startX - 16, startY - 12, 330, 80);
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(startX - 16, startY - 12, 330, 80);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 13px monospace";
+      ctx.fillText("FLOOR MAP", startX, startY + 2);
+
+      for (let i = 1; i <= ROOMS_PER_FLOOR; i += 1) {
+        const row = i <= 7 ? 0 : 1;
+        const col = row === 0 ? i - 1 : i - 8;
+        const x = startX + col * (cell + gap);
+        const y = startY + 16 + row * (cell + gap);
+
+        const isCurrent = i === this.roomNumber;
+        const isCleared = Boolean(progress.clearedRooms[i]);
+        const isVisited = Boolean(progress.visitedRooms[i]);
+        const isBoss = i === ROOMS_PER_FLOOR;
+
+        if (isCurrent) {
+          ctx.fillStyle = "#facc15";
+        } else if (isCleared) {
+          ctx.fillStyle = "#22c55e";
+        } else if (isVisited) {
+          ctx.fillStyle = "#38bdf8";
+        } else if (isBoss) {
+          ctx.fillStyle = "#7f1d1d";
+        } else {
+          ctx.fillStyle = "#334155";
+        }
+
+        ctx.fillRect(x, y, cell, cell);
+        ctx.strokeStyle = isCurrent ? "#ffffff" : "#94a3b8";
+        ctx.lineWidth = isCurrent ? 3 : 1;
+        ctx.strokeRect(x, y, cell, cell);
+
+        ctx.fillStyle = isBoss ? "#ffffff" : "#0f172a";
+        ctx.font = "bold 10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(isBoss ? "B" : String(i), x + cell / 2, y + 15);
       }
 
       ctx.restore();

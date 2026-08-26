@@ -1,0 +1,318 @@
+/* style.css - The Lab visual styling */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #0a0a12;
+    color: #e0e0e0;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+    user-select: none;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+#gameCanvas {
+    display: block;
+    background: #0f1425;
+}
+
+/* ── HUD ─────────────────────────────────────────────── */
+#ui-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    pointer-events: none;
+}
+
+#hud {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    padding: 10px 16px;
+    background: rgba(10, 10, 20, 0.75);
+    border-bottom: 1px solid #1a2a4a;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+}
+
+#hud .label {
+    color: #7090c0;
+    margin-right: 4px;
+    text-transform: uppercase;
+    font-size: 10px;
+}
+
+#brain-counter {
+    display: inline-flex;
+    gap: 3px;
+}
+
+.brain-icon {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.brain-icon.empty {
+    opacity: 0.25;
+    filter: grayscale(1);
+}
+
+#floor-number,
+#room-number,
+#coin-count {
+    color: #00e5ff;
+    font-weight: bold;
+}
+
+#inventory-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    font-size: 12px;
+    background: rgba(10, 10, 20, 0.5);
+}
+
+#weapon-slots {
+    display: flex;
+    gap: 8px;
+}
+
+.weapon-slot {
+    min-width: 80px;
+    padding: 3px 8px;
+    border: 1px solid #1a3a5a;
+    border-radius: 3px;
+    color: #4a6a9a;
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.4);
+    text-align: center;
+}
+
+.weapon-slot.equipped {
+    border-color: #00e5ff;
+    color: #00e5ff;
+}
+
+/* ── Overlays ────────────────────────────────────────── */
+.overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 8, 18, 0.88);
+    z-index: 100;
+    pointer-events: all;
+}
+
+.overlay.hidden {
+    display: none;
+}
+
+.menu-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 48px 64px;
+    background: rgba(15, 20, 40, 0.95);
+    border: 1px solid #1a3a6a;
+    border-radius: 6px;
+    min-width: 320px;
+    box-shadow: 0 0 40px rgba(0, 100, 200, 0.15);
+}
+
+.menu-panel h1 {
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    color: #00e5ff;
+    text-shadow: 0 0 20px rgba(0, 229, 255, 0.5);
+}
+
+.menu-panel h2 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #c0d8ff;
+}
+
+.menu-panel p {
+    color: #6080a0;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+}
+
+.menu-button {
+    width: 200px;
+    padding: 12px 0;
+    background: transparent;
+    border: 1px solid #2a4a7a;
+    color: #a0c0e0;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.menu-button:hover {
+    background: rgba(0, 80, 160, 0.3);
+    border-color: #00e5ff;
+    color: #00e5ff;
+}
+
+.menu-button:active {
+    background: rgba(0, 80, 160, 0.5);
+}
+
+/* ── Game Over ───────────────────────────────────────── */
+#gameover-title {
+    font-size: 36px;
+    letter-spacing: 0.12em;
+    color: #ff3355;
+    text-shadow: 0 0 20px rgba(255, 50, 80, 0.4);
+}
+
+#gameover-title.victory {
+    color: #00ff99;
+    text-shadow: 0 0 20px rgba(0, 255, 150, 0.4);
+}
+
+#gameover-stats {
+    text-align: center;
+    line-height: 2;
+    color: #8090b0;
+    font-size: 13px;
+}
+
+#gameover-stats p span {
+    color: #c0d8ff;
+}
+
+/* ── Codex ───────────────────────────────────────────── */
+.codex-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 32px 48px;
+    background: rgba(15, 20, 40, 0.97);
+    border: 1px solid #1a3a6a;
+    border-radius: 6px;
+    width: min(90vw, 700px);
+    max-height: 80vh;
+    box-shadow: 0 0 40px rgba(0, 100, 200, 0.15);
+}
+
+.codex-panel h2 {
+    font-size: 24px;
+    letter-spacing: 0.15em;
+    color: #00e5ff;
+    text-align: center;
+}
+
+#codex-content {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding-right: 8px;
+}
+
+#codex-content::-webkit-scrollbar {
+    width: 4px;
+}
+
+#codex-content::-webkit-scrollbar-track {
+    background: #0a0a1a;
+}
+
+#codex-content::-webkit-scrollbar-thumb {
+    background: #2a4a7a;
+    border-radius: 2px;
+}
+
+.codex-section h3 {
+    color: #7090c0;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    border-bottom: 1px solid #1a2a4a;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+}
+
+.codex-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    background: rgba(0, 0, 0, 0.2);
+    margin-bottom: 6px;
+}
+
+.codex-entry .icon {
+    font-size: 20px;
+    min-width: 28px;
+    text-align: center;
+}
+
+.codex-entry .name {
+    color: #c0d8ff;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.codex-entry .desc {
+    color: #7090a8;
+}
+
+/* ── Notifications ───────────────────────────────────── */
+#notification-container {
+    position: absolute;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+    z-index: 200;
+}
+
+.notification {
+    padding: 8px 20px;
+    background: rgba(0, 20, 50, 0.9);
+    border: 1px solid #2a5a9a;
+    border-radius: 20px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: #a0d0ff;
+    animation: notif-in 0.2s ease-out, notif-out 0.3s ease-in 1.7s forwards;
+}
+
+@keyframes notif-in {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes notif-out {
+    to { opacity: 0; transform: translateY(-10px); }
+}

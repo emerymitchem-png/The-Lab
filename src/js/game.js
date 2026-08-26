@@ -184,9 +184,9 @@ class Game {
     }
 
     victory() {
-        this.gameState = 'victory';
-        alert("VICTORY! You defeated The Infinitum!");
-        this.gameOver();
+        this.gameState = 'gameover';
+        this.stats.elapsedTime = this.elapsedTime;
+        uiManager.showGameOver(this.stats, true);
     }
 
     animate(lastTime) {

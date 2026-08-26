@@ -322,6 +322,11 @@
     }
 
     drawFloorMap() {
+      if (this.floor === 1) {
+        this.drawFirstFloorPixelMap();
+        return;
+      }
+
       const ctx = this.ctx;
       const progress = this.ensureFloorProgress(this.floor);
       const startX = this.width - 342;
@@ -372,6 +377,137 @@
         ctx.font = "bold 10px monospace";
         ctx.textAlign = "center";
         ctx.fillText(isBoss ? "B" : String(i), x + cell / 2, y + 15);
+      }
+
+      ctx.restore();
+    }
+
+    drawFirstFloorPixelMap() {
+      const ctx = this.ctx;
+      const progress = this.ensureFloorProgress(1);
+      const panelX = this.width - 352;
+      const panelY = 10;
+      const panelWidth = 338;
+      const panelHeight = 116;
+      const gridSize = 15;
+      const spacingX = 28;
+      const spacingY = 20;
+      const mapOriginX = panelX + 32;
+      const mapOriginY = panelY + 34;
+
+      const roomPositions = {
+        1: [0, 2],
+        2: [1, 2],
+        3: [2, 2],
+        4: [3, 1],
+        5: [3, 2],
+        6: [3, 3],
+        7: [4, 1],
+        8: [4, 2],
+        9: [4, 3],
+        10: [5, 2],
+        11: [6, 2],
+        12: [7, 2],
+        13: [8, 2]
+      };
+
+      const links = [
+        [1, 2], [2, 3],
+        [3, 4], [3, 5], [3, 6],
+        [4, 7], [5, 8], [6, 9],
+        [7, 10], [8, 10], [9, 10],
+        [10, 11], [11, 12], [12, 13]
+      ];
+
+      ctx.save();
+
+      ctx.fillStyle = "#0b1124";
+      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+      ctx.fillStyle = "#17203a";
+      ctx.fillRect(panelX + 3, panelY + 3, panelWidth - 6, panelHeight - 6);
+      ctx.fillStyle = "#22315e";
+      for (let x = panelX + 7; x < panelX + panelWidth - 8; x += 8) {
+        ctx.fillRect(x, panelY + 7, 2, 2);
+        ctx.fillRect(x, panelY + panelHeight - 9, 2, 2);
+      }
+      for (let y = panelY + 7; y < panelY + panelHeight - 8; y += 8) {
+        ctx.fillRect(panelX + 7, y, 2, 2);
+        ctx.fillRect(panelX + panelWidth - 9, y, 2, 2);
+      }
+
+      ctx.fillStyle = "#dbeafe";
+      ctx.font = "bold 12px monospace";
+      ctx.textAlign = "left";
+      ctx.fillText("F1 MAP", panelX + 10, panelY + 18);
+
+      for (const [fromRoom, toRoom] of links) {
+        const from = roomPositions[fromRoom];
+        const to = roomPositions[toRoom];
+        if (!from || !to) continue;
+        const x1 = mapOriginX + from[0] * spacingX + Math.floor(gridSize / 2);
+        const y1 = mapOriginY + from[1] * spacingY + Math.floor(gridSize / 2);
+        const x2 = mapOriginX + to[0] * spacingX + Math.floor(gridSize / 2);
+        const y2 = mapOriginY + to[1] * spacingY + Math.floor(gridSize / 2);
+
+        ctx.fillStyle = "#475569";
+        if (y1 === y2) {
+          const left = Math.min(x1, x2);
+          ctx.fillRect(left, y1 - 2, Math.abs(x2 - x1), 4);
+        } else if (x1 === x2) {
+          const top = Math.min(y1, y2);
+          ctx.fillRect(x1 - 2, top, 4, Math.abs(y2 - y1));
+        } else {
+          const bendX = x2;
+          const left = Math.min(x1, bendX);
+          const top = Math.min(y1, y2);
+          ctx.fillRect(left, y1 - 2, Math.abs(bendX - x1), 4);
+          ctx.fillRect(bendX - 2, top, 4, Math.abs(y2 - y1));
+        }
+      }
+
+      for (let i = 1; i <= ROOMS_PER_FLOOR; i += 1) {
+        const point = roomPositions[i];
+        if (!point) continue;
+        const x = mapOriginX + point[0] * spacingX;
+        const y = mapOriginY + point[1] * spacingY;
+
+        const isCurrent = i === this.roomNumber;
+        const isCleared = Boolean(progress.clearedRooms[i]);
+        const isVisited = Boolean(progress.visitedRooms[i]);
+        const isBoss = i === ROOMS_PER_FLOOR;
+
+        let fill = "#334155";
+        let border = "#64748b";
+        if (isBoss) {
+          fill = "#7f1d1d";
+          border = "#fca5a5";
+        }
+        if (isVisited) {
+          fill = "#1e3a8a";
+          border = "#60a5fa";
+        }
+        if (isCleared) {
+          fill = "#14532d";
+          border = "#86efac";
+        }
+        if (isCurrent) {
+          fill = "#ca8a04";
+          border = "#fef08a";
+        }
+
+        ctx.fillStyle = border;
+        ctx.fillRect(x - 1, y - 1, gridSize + 2, gridSize + 2);
+        ctx.fillStyle = fill;
+        ctx.fillRect(x, y, gridSize, gridSize);
+        ctx.fillStyle = "rgba(255,255,255,0.18)";
+        ctx.fillRect(x + 2, y + 2, 4, 4);
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.fillRect(x + gridSize - 4, y + gridSize - 4, 3, 3);
+
+        ctx.fillStyle = isBoss ? "#fee2e2" : "#e2e8f0";
+        ctx.font = "bold 8px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(isBoss ? "B" : String(i), x + Math.floor(gridSize / 2), y + 10);
       }
 
       ctx.restore();

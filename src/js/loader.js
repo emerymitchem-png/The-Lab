@@ -3,16 +3,32 @@
 const gameLoader = {
     data: {},
 
+    // Docs live at ../docs/ locally (when opened from src/) but at docs/ on
+    // GitHub Pages (where the workflow copies docs into src/docs/).
+    _docBase: null,
+
+    async _resolveDocBase() {
+        if (this._docBase !== null) return this._docBase;
+        // Try the Pages-relative path first, fall back to local
+        try {
+            const r = await fetch('docs/floors.json', { method: 'HEAD' });
+            if (r.ok) { this._docBase = 'docs/'; return this._docBase; }
+        } catch (_) { /* ignore */ }
+        this._docBase = '../docs/';
+        return this._docBase;
+    },
+
     async loadAllData() {
+        const base = await this._resolveDocBase();
         const files = [
-            { key: 'floors',           path: '../docs/floors.json' },
-            { key: 'enemies',          path: '../docs/enemies.json' },
-            { key: 'specializations',  path: '../docs/specializations.json' },
-            { key: 'artifacts',        path: '../docs/artifacts.json' },
-            { key: 'consumables',      path: '../docs/consumables.json' },
-            { key: 'permanentTools',   path: '../docs/permanent_tools.json' },
-            { key: 'shopEconomy',      path: '../docs/shop_economy.json' },
-            { key: 'stats',            path: '../docs/stats_system.json' },
+            { key: 'floors',           path: `${base}floors.json` },
+            { key: 'enemies',          path: `${base}enemies.json` },
+            { key: 'specializations',  path: `${base}specializations.json` },
+            { key: 'artifacts',        path: `${base}artifacts.json` },
+            { key: 'consumables',      path: `${base}consumables.json` },
+            { key: 'permanentTools',   path: `${base}permanent_tools.json` },
+            { key: 'shopEconomy',      path: `${base}shop_economy.json` },
+            { key: 'stats',            path: `${base}stats_system.json` },
         ];
 
         const results = await Promise.allSettled(

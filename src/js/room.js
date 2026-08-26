@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const ROOM_VERSION = "1.0.25";
+  const ROOM_VERSION = "1.0.26";
   const DEFAULT_ROOM_WIDTH = 960;
   const DEFAULT_ROOM_HEIGHT = 640;
   const DEFAULT_WALL_THICKNESS = 36;
@@ -23,6 +23,36 @@
       a.y < b.y + b.height &&
       a.y + a.height > b.y
     );
+  }
+
+  function pointInRect(x, y, rect) {
+    return (
+      x >= rect.x &&
+      x <= rect.x + rect.width &&
+      y >= rect.y &&
+      y <= rect.y + rect.height
+    );
+  }
+
+  function getEntityRect(entity) {
+    if (!entity) return { x: 0, y: 0, width: 0, height: 0 };
+    if (typeof entity.getRect === "function") {
+      return entity.getRect();
+    }
+    const radius = safeNumber(entity.radius, 12);
+    return {
+      x: safeNumber(entity.x, 0) - radius,
+      y: safeNumber(entity.y, 0) - radius,
+      width: radius * 2,
+      height: radius * 2
+    };
+  }
+
+  function rectCenter(rect) {
+    return {
+      x: rect.x + rect.width / 2,
+      y: rect.y + rect.height / 2
+    };
   }
 
   function getDifficultyScale(floor) {
@@ -142,6 +172,7 @@
       enemyCountMax: safeNumber(nested.enemyCountMax ?? nested.enemy_count_max ?? nested.maxEnemies ?? nested.max_enemies, 3),
       spawnRate: safeNumber(nested.spawnRate ?? nested.spawn_rate ?? nested.enemySpawnRate ?? nested.enemy_spawn_rate, 1),
       difficultyScale: safeNumber(nested.difficultyScale ?? nested.difficulty_scale, getDifficultyScale(floor)),
+      barriers: nested.barriers && typeof nested.barriers === "object" ? nested.barriers : {},
       rooms: []
     };
 
@@ -313,8 +344,11 @@
       this.exitDoor = this.generateExitDoor();
       this.safeZones = this.generateSafeZones();
       this.walls = this.generateWalls();
+      this.environmentFeatures = this.generateEnvironmentalFeatures();
+      this.roomFeatures = this.generateRoomFeatures();
       this.enemies = [];
       this.spawnEnemies(options.enemyData);
+      this.roomFeaturePromptCooldown = 0;
 
       if (isSafeType) {
         const label = this.type === "marked" ? "MARKED ROOM" : "SHOP";
@@ -524,6 +558,135 @@
       ];
     }
 
+    getFeatureRect(slot, total, width = 96, height = 76) {
+      const margin = this.wallThickness + 80;
+      const usableWidth = Math.max(1, this.width - margin * 2);
+      const usableHeight = Math.max(1, this.height - margin * 2);
+      const angle = ((Math.PI * 2) / Math.max(1, total)) * slot + (this.floor * 0.22);
+      const radiusX = usableWidth * 0.34;
+      const radiusY = usableHeight * 0.28;
+      const cx = clamp(this.width * 0.5 + Math.cos(angle) * radiusX, margin, this.width - margin);
+      const cy = clamp(this.height * 0.5 + Math.sin(angle) * radiusY, margin, this.height - margin);
+      return {
+        x: cx - width / 2,
+        y: cy - height / 2,
+        width,
+        height
+      };
+    }
+
+    createEnvironmentalFeature(type, slot, total) {
+      const featureType = normalizeRoomTypeName(type);
+      const rect = this.getFeatureRect(slot, total, 110, 84);
+      const map = {
+        fire: { color: "#dc2626", label: "FIRE", damagePerSecond: 5, speedMultiplier: 1, pulse: true },
+        sealed: { color: "#64748b", label: "SEALED", damagePerSecond: 0, speedMultiplier: 1, pulse: false },
+        gaps: { color: "#111827", label: "GAP", damagePerSecond: 7, speedMultiplier: 0.88, pulse: true },
+        rock: { color: "#6b7280", label: "ROCK", damagePerSecond: 0, speedMultiplier: 0.92, pulse: false },
+        ice: { color: "#38bdf8", label: "ICE", damagePerSecond: 0, speedMultiplier: 0.72, pulse: true },
+        water: { color: "#1d4ed8", label: "WATER", damagePerSecond: 1.5, speedMultiplier: 0.82, pulse: true },
+        wind: { color: "#93c5fd", label: "WIND", damagePerSecond: 0, speedMultiplier: 0.9, pushX: 22, pushY: 0, pulse: true },
+        storm: { color: "#a78bfa", label: "STORM", damagePerSecond: 4, speedMultiplier: 0.8, pulse: true },
+        cosmic: { color: "#7c3aed", label: "COSMIC", damagePerSecond: 6, speedMultiplier: 0.86, pulse: true },
+        primordial: { color: "#f97316", label: "PRIMORDIAL", damagePerSecond: 5, speedMultiplier: 0.9, pulse: true },
+        mixed: { color: "#14b8a6", label: "MIXED", damagePerSecond: 4.5, speedMultiplier: 0.82, pushX: 14, pushY: -8, pulse: true }
+      };
+      const defaults = map[featureType] || { color: "#475569", label: String(type || "FIELD").toUpperCase(), damagePerSecond: 0, speedMultiplier: 1, pulse: false };
+      return {
+        kind: "environment",
+        type: featureType,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        color: defaults.color,
+        label: defaults.label,
+        damagePerSecond: safeNumber(defaults.damagePerSecond, 0),
+        speedMultiplier: clamp(safeNumber(defaults.speedMultiplier, 1), 0.4, 1),
+        pushX: safeNumber(defaults.pushX, 0),
+        pushY: safeNumber(defaults.pushY, 0),
+        pulse: Boolean(defaults.pulse),
+        tickTimer: 0.25
+      };
+    }
+
+    generateEnvironmentalFeatures() {
+      const barrierCounts = this.floorData.barriers && typeof this.floorData.barriers === "object"
+        ? this.floorData.barriers
+        : {};
+
+      const weightedTypes = [];
+      for (const [barrierType, countValue] of Object.entries(barrierCounts)) {
+        if (barrierType === "total") continue;
+        const count = clamp(safeInt(countValue, 0), 0, 4);
+        for (let i = 0; i < count; i += 1) {
+          weightedTypes.push(normalizeRoomTypeName(barrierType));
+        }
+      }
+
+      if (weightedTypes.length === 0) {
+        return [];
+      }
+
+      const preferredCount = {
+        normal: 1,
+        secret: 2,
+        mystery: 3,
+        marked: 1,
+        shop: 1,
+        shop_locked: 1,
+        boss: 2
+      };
+      const target = clamp(preferredCount[this.type] || 1, 1, 3);
+      const features = [];
+
+      for (let i = 0; i < target; i += 1) {
+        const index = Math.abs((this.floor * 41 + this.roomNumber * 13 + i * 29) % weightedTypes.length);
+        const barrierType = weightedTypes[index];
+        const feature = this.createEnvironmentalFeature(barrierType, i, target);
+        features.push(feature);
+      }
+
+      return features;
+    }
+
+    createRoomFeature(type, options = {}) {
+      const rect = options.rect || this.getFeatureRect(options.slot || 0, options.total || 1, options.width || 96, options.height || 68);
+      return {
+        kind: "room_feature",
+        type,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        color: options.color || "#facc15",
+        label: options.label || "FEATURE",
+        used: false,
+        oneTime: options.oneTime !== false
+      };
+    }
+
+    generateRoomFeatures() {
+      const features = [];
+      const add = (type, options) => features.push(this.createRoomFeature(type, options));
+
+      if (this.type === "secret") {
+        add("secret_cache", { label: "SECRET CACHE", color: "#a855f7", slot: 0, total: 1, width: 116, height: 72 });
+      } else if (this.type === "marked") {
+        add("marked_reward", { label: "MARKED ALTAR", color: "#0d9488", slot: 0, total: 1, width: 116, height: 72 });
+      } else if (this.type === "shop" || this.type === "shop_locked") {
+        add("shop_station", { label: "SUPPLY STATION", color: "#f59e0b", slot: 0, total: 1, width: 132, height: 72 });
+      } else if (this.type === "mystery") {
+        add("mystery_cache", { label: "UNSTABLE CACHE", color: "#7c3aed", slot: 0, total: 1, width: 128, height: 72 });
+      } else if (this.type === "boss") {
+        add("boss_console", { label: "CORE CONSOLE", color: "#ef4444", slot: 0, total: 1, width: 120, height: 72 });
+      } else {
+        add("normal_terminal", { label: "RESEARCH NODE", color: "#3b82f6", slot: 0, total: 1, width: 118, height: 68 });
+      }
+
+      return features;
+    }
+
     makeBossObstacles() {
       const w = this.width;
       const h = this.height;
@@ -622,6 +785,8 @@
       const delta = safeNumber(dt, 0);
       this.started = true;
       this.updateFeedback(delta);
+      this.updateEnvironmentalFeatures(delta, player);
+      this.updateRoomFeatures(delta, player);
 
       for (const enemy of this.enemies) {
         if (enemy && typeof enemy.update === "function") {
@@ -651,6 +816,110 @@
         text.life -= dt;
       }
       this.feedbackTexts = this.feedbackTexts.filter((text) => text.life > 0);
+    }
+
+    updateRoomFeatures(dt, player) {
+      if (!player) return;
+      const playerRect = getEntityRect(player);
+      this.roomFeaturePromptCooldown = Math.max(0, this.roomFeaturePromptCooldown - safeNumber(dt, 0));
+
+      for (const feature of this.roomFeatures || []) {
+        if (!feature || (feature.oneTime && feature.used)) continue;
+        if (!rectsOverlap(playerRect, feature)) continue;
+        this.activateRoomFeature(feature, player);
+      }
+    }
+
+    activateRoomFeature(feature, player) {
+      if (!feature || (feature.oneTime && feature.used)) return;
+      const center = rectCenter(feature);
+      let message = "";
+      let color = feature.color || "#f8fafc";
+
+      if (feature.type === "secret_cache") {
+        const gold = 18 + this.floor * 5;
+        const xp = 20 + this.floor * 6;
+        if (typeof player.addGold === "function") player.addGold(gold);
+        if (typeof player.addXP === "function") player.addXP(xp);
+        message = `Secret cache: +${gold}g +${xp}xp`;
+      } else if (feature.type === "marked_reward") {
+        const heal = 8 + this.floor * 2;
+        const recovered = typeof player.heal === "function" ? player.heal(heal) : 0;
+        const gold = 10 + this.floor * 4;
+        if (typeof player.addGold === "function") player.addGold(gold);
+        message = `Marked reward: +${gold}g +${Math.round(recovered)}hp`;
+      } else if (feature.type === "shop_station") {
+        const heal = 6 + this.floor * 2;
+        const recovered = typeof player.heal === "function" ? player.heal(heal) : 0;
+        message = recovered > 0 ? `Supply station: +${Math.round(recovered)}hp` : "Supply station: fully stocked";
+      } else if (feature.type === "mystery_cache") {
+        const gold = 24 + this.floor * 8;
+        const xp = 32 + this.floor * 9;
+        if (typeof player.takeDamage === "function") {
+          player.takeDamage(6 + this.floor, { type: "mystery_cache" });
+        }
+        if (typeof player.addGold === "function") player.addGold(gold);
+        if (typeof player.addXP === "function") player.addXP(xp);
+        message = `Mystery cache: +${gold}g +${xp}xp (volatile)`;
+        color = "#c084fc";
+      } else if (feature.type === "boss_console") {
+        const heal = 5 + this.floor;
+        const recovered = typeof player.heal === "function" ? player.heal(heal) : 0;
+        message = recovered > 0 ? `Core console: stabilized +${Math.round(recovered)}hp` : "Core console: stabilized";
+        color = "#fb7185";
+      } else if (feature.type === "normal_terminal") {
+        const xp = 10 + this.floor * 3;
+        if (typeof player.addXP === "function") player.addXP(xp);
+        message = `Research node: +${xp}xp`;
+      }
+
+      feature.used = feature.oneTime !== false;
+      if (message) {
+        this.addFeedback(message, center.x, center.y - 22, color);
+      }
+    }
+
+    updateEnvironmentalFeatures(dt, player) {
+      if (!player) return;
+
+      const delta = safeNumber(dt, 0);
+      const playerRect = getEntityRect(player);
+      const baseSpeed = safeNumber(player.baseSpeed, player.speed);
+      let speedMultiplier = 1;
+
+      for (const feature of this.environmentFeatures || []) {
+        if (!feature) continue;
+        const overlap = rectsOverlap(playerRect, feature);
+        if (!overlap) continue;
+
+        speedMultiplier = Math.min(speedMultiplier, clamp(safeNumber(feature.speedMultiplier, 1), 0.4, 1));
+
+        const pushX = safeNumber(feature.pushX, 0);
+        const pushY = safeNumber(feature.pushY, 0);
+        if (pushX !== 0 || pushY !== 0) {
+          player.x += pushX * delta;
+          player.y += pushY * delta;
+        }
+
+        const dps = Math.max(0, safeNumber(feature.damagePerSecond, 0));
+        feature.tickTimer = safeNumber(feature.tickTimer, 0.25) - delta;
+        if (dps > 0 && feature.tickTimer <= 0) {
+          const damage = Math.max(1, Math.round(dps * 0.4));
+          if (typeof player.takeDamage === "function") {
+            const dealt = player.takeDamage(damage, { type: `environment_${feature.type}` });
+            if (dealt > 0) {
+              const center = rectCenter(feature);
+              this.addFeedback(`-${dealt} ${feature.label}`, center.x, center.y - 18, "#fca5a5");
+            }
+          }
+          feature.tickTimer = 0.4;
+        } else if (feature.tickTimer <= 0) {
+          feature.tickTimer = 0.4;
+        }
+      }
+
+      player.speed = baseSpeed * speedMultiplier;
+      player.moveSpeed = player.speed;
     }
 
     getAliveEnemyCount() {
@@ -707,8 +976,10 @@
       if (!ctx) return;
 
       this.drawFloor(ctx, camera);
+      this.drawEnvironmentalFeatures(ctx, camera);
       this.drawExit(ctx, camera);
       this.drawWalls(ctx, camera);
+      this.drawRoomFeatures(ctx, camera);
 
       for (const enemy of this.enemies) {
         if (enemy && typeof enemy.draw === "function") {
@@ -785,6 +1056,34 @@
       ctx.restore();
     }
 
+    drawEnvironmentalFeatures(ctx, camera) {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "bold 11px monospace";
+
+      for (const feature of this.environmentFeatures || []) {
+        if (!feature) continue;
+        const x = feature.x - safeNumber(camera.x, 0);
+        const y = feature.y - safeNumber(camera.y, 0);
+        const alphaPulse = feature.pulse ? (0.16 + Math.sin(performance.now() / 170) * 0.08) : 0.18;
+
+        ctx.fillStyle = feature.color;
+        ctx.globalAlpha = clamp(alphaPulse, 0.08, 0.3);
+        ctx.fillRect(x, y, feature.width, feature.height);
+
+        ctx.globalAlpha = 0.75;
+        ctx.strokeStyle = feature.color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 1, y + 1, feature.width - 2, feature.height - 2);
+
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = "#e2e8f0";
+        ctx.fillText(feature.label, x + feature.width / 2, y + feature.height / 2 + 4);
+      }
+
+      ctx.restore();
+    }
+
     drawWalls(ctx, camera) {
       ctx.save();
 
@@ -817,6 +1116,32 @@
           ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
           ctx.fillRect(x + 5, y + 5, Math.max(0, wall.width - 10), 5);
         }
+      }
+
+      ctx.restore();
+    }
+
+    drawRoomFeatures(ctx, camera) {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "bold 12px monospace";
+
+      for (const feature of this.roomFeatures || []) {
+        if (!feature || (feature.oneTime && feature.used)) continue;
+        const x = feature.x - safeNumber(camera.x, 0);
+        const y = feature.y - safeNumber(camera.y, 0);
+
+        ctx.fillStyle = feature.color;
+        ctx.globalAlpha = 0.22;
+        ctx.fillRect(x, y, feature.width, feature.height);
+
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = feature.color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 1, y + 1, feature.width - 2, feature.height - 2);
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.fillText(feature.label, x + feature.width / 2, y + feature.height / 2 + 4);
       }
 
       ctx.restore();

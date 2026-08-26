@@ -1,455 +1,731 @@
-// room.js - Room generation, rendering, and door-based navigation
+(function () {
+  "use strict";
 
-const TILE = 40;
-const WALL = 48;       // wall thickness in px
-const DOOR_W = 80;     // door opening width
-const DOOR_H = WALL;   // door depth
+  const ROOM_VERSION = "1.0.24";
+  const DEFAULT_ROOM_WIDTH = 960;
+  const DEFAULT_ROOM_HEIGHT = 640;
+  const DEFAULT_WALL_THICKNESS = 36;
+  const ROOMS_PER_FLOOR = 13;
 
-// ── FloorMap ────────────────────────────────────────────────────────────────
-// Pre-plans the ordered sequence of room types for a floor before any room
-// is visited. The design doc defines the structure per floor:
-//   normal rooms → secret → shop → boss, with locked doors woven in.
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
 
-class FloorMap {
-    constructor(floorNumber) {
-        this.floorNumber = floorNumber;
-        const fd = gameLoader.getFloorData(floorNumber);
-        this.sequence = this._buildSequence(fd);
-        this.totalRooms = this.sequence.length;
+  function safeNumber(value, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
+
+  function rectsOverlap(a, b) {
+    return (
+      a.x < b.x + b.width &&
+      a.x + a.width > b.x &&
+      a.y < b.y + b.height &&
+      a.y + a.height > b.y
+    );
+  }
+
+  function getDifficultyScale(floor) {
+    const safeFloor = clamp(safeNumber(floor, 1), 1, 5);
+    return 1 + ((safeFloor - 1) * 0.125);
+  }
+
+  function getLoader() {
+    return window.gameLoader || window.GameLoader || window.loader || null;
+  }
+
+  function callLoaderMethod(methodName, ...args) {
+    const loader = getLoader();
+    if (!loader || typeof loader[methodName] !== "function") {
+      return null;
     }
 
-    // Returns room type string at 1-based index
-    typeAt(index) {
-        return this.sequence[index - 1] ?? 'normal';
-    }
-
-    _buildSequence(fd) {
-        if (!fd) return this._fallback();
-
-        const gr = fd.guaranteed_rooms;
-        const hasProcMystery = Math.random() < 0.25; // 25% mystery door
-
-        // Build pool of room types
-        const pool = [];
-
-        // Room 1 is always a safe start (empty normal room)
-        pool.push('start');
-
-        // Normal combat rooms (minus the start room we just added)
-        for (let i = 0; i < (gr.normal_rooms - 1); i++) pool.push('normal');
-
-        // Secret rooms (1 on floors 1-3, 2 on floors 4-5)
-        for (let i = 0; i < (gr.secret_rooms ?? 1); i++) pool.push('secret');
-
-        // Marked door (unlocked, safe rare chest room)
-        for (let i = 0; i < (gr.marked_unlocked_door ?? 1); i++) pool.push('marked_door');
-
-        // Procedural locked door
-        pool.push(hasProcMystery ? 'locked_mystery' : 'locked_shop');
-
-        // Shuffle all rooms except first (start) and last two (shop then boss)
-        const shuffleable = pool.slice(1);
-        this._shuffle(shuffleable);
-        const middle = ['start', ...shuffleable];
-
-        // Guaranteed shop then boss at the end
-        middle.push('shop');
-        middle.push('boss');
-
-        return middle;
-    }
-
-    _shuffle(arr) {
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-    }
-
-    _fallback() {
-        // Default 11-room floor 1 layout if data missing
-        return ['start','normal','normal','normal','normal','normal','secret','marked_door','locked_shop','shop','boss'];
-    }
-}
-
-// ── Room ─────────────────────────────────────────────────────────────────────
-
-class Room {
-    constructor(floor, roomIndex, floorMap, canvas) {
-        this.floor = floor;
-        this.roomIndex = roomIndex;
-        this.floorMap = floorMap;
-        this.totalRooms = floorMap.totalRooms;
-        this.canvas = canvas;
-
-        this.roomType = floorMap.typeAt(roomIndex);
-        this.palette = this._getPalette(floor);
-
-        // Playable bounds (inside walls) — HUD is outside the canvas now
-        this.bounds = {
-            x: WALL,
-            y: WALL,
-            width:  canvas.width  - WALL * 2,
-            height: canvas.height - WALL * 2,
-        };
-
-        this.isFirstRoom = roomIndex === 1;
-        this.isLastRoom  = roomIndex === floorMap.totalRooms;
-
-        this.enemies = [];
-        this.cleared  = false;
-        this.clearFlashTimer = 0;
-
-        // All 4 door zones (player walks into one to advance)
-        this.doors = {
-            right:  this._makeDoor('right'),
-            left:   this._makeDoor('left'),
-            top:    this._makeDoor('top'),
-            bottom: this._makeDoor('bottom'),
-        };
-
-        this._spawnEnemies();
-    }
-
-    // ── Door zone helpers ────────────────────────────────────────────────────
-
-    _makeDoor(side) {
-        const { x, y, width, height } = this.bounds;
-        const midX = x + width  / 2 - DOOR_W / 2;
-        const midY = y + height / 2 - DOOR_W / 2;
-        switch (side) {
-            case 'right':  return { x: x + width, y: midY,       width: DOOR_H, height: DOOR_W, side };
-            case 'left':   return { x: x - DOOR_H, y: midY,      width: DOOR_H, height: DOOR_W, side };
-            case 'top':    return { x: midX, y: y - DOOR_H,      width: DOOR_W, height: DOOR_H, side };
-            case 'bottom': return { x: midX, y: y + height,      width: DOOR_W, height: DOOR_H, side };
-        }
-    }
-
-    // Returns exit direction string if player is in an open door zone, else null
-    getExitDirection(player) {
-        if (!this.cleared) return null;
-        const pb = { x: player.x, y: player.y, width: player.width, height: player.height };
-        for (const [dir, zone] of Object.entries(this.doors)) {
-            if (this._rectsOverlap(pb, zone)) return dir;
-        }
+    try {
+      const result = loader[methodName](...args);
+      if (result && typeof result.then === "function") {
+        console.warn(`[Room] ${methodName} returned a Promise. Version 1.0.23 expects preloaded synchronous JSON data.`);
         return null;
+      }
+      return result;
+    } catch (error) {
+      console.warn(`[Room] Could not load ${methodName}. Using fallback data.`, error);
+      return null;
+    }
+  }
+
+  function normalizeFloorData(rawFloorData, floor) {
+    const data = rawFloorData && typeof rawFloorData === "object" ? rawFloorData : {};
+    const floorKey = String(floor);
+    const nested = data[floorKey] || data[`floor${floor}`] || data[`floor_${floor}`] || data;
+
+    return {
+      floor,
+      roomsPerFloor: safeNumber(nested.roomsPerFloor ?? nested.rooms_per_floor ?? nested.roomCount ?? nested.room_count, ROOMS_PER_FLOOR),
+      width: safeNumber(nested.width ?? nested.roomWidth ?? nested.room_width, DEFAULT_ROOM_WIDTH),
+      height: safeNumber(nested.height ?? nested.roomHeight ?? nested.room_height, DEFAULT_ROOM_HEIGHT),
+      wallThickness: safeNumber(nested.wallThickness ?? nested.wall_thickness, DEFAULT_WALL_THICKNESS),
+      enemyCountMin: safeNumber(nested.enemyCountMin ?? nested.enemy_count_min ?? nested.minEnemies ?? nested.min_enemies, 2),
+      enemyCountMax: safeNumber(nested.enemyCountMax ?? nested.enemy_count_max ?? nested.maxEnemies ?? nested.max_enemies, 3),
+      spawnRate: safeNumber(nested.spawnRate ?? nested.spawn_rate ?? nested.enemySpawnRate ?? nested.enemy_spawn_rate, 1),
+      difficultyScale: safeNumber(nested.difficultyScale ?? nested.difficulty_scale, getDifficultyScale(floor)),
+      rooms: Array.isArray(nested.rooms) ? nested.rooms : []
+    };
+  }
+
+  function getRoomType(roomNumber, floorData) {
+    const index = roomNumber - 1;
+    const roomEntry = floorData.rooms[index];
+    const explicitType = typeof roomEntry === "string" ? roomEntry : roomEntry && roomEntry.type;
+
+    if (explicitType) {
+      return String(explicitType).toLowerCase();
     }
 
-    // ── Spawning ─────────────────────────────────────────────────────────────
+    if (roomNumber === floorData.roomsPerFloor) {
+      return "boss";
+    }
 
-    _spawnEnemies() {
-        // These room types have no enemies
-        const safeRooms = new Set(['start','shop','secret','marked_door','locked_shop']);
-        if (safeRooms.has(this.roomType)) {
-            this.cleared = true;
-            return;
+    const pattern = (floorData.floor * 97 + roomNumber * 53) % 100;
+    if (pattern < 80) return "normal";
+    if (pattern < 90) return "secret";
+    if (pattern < 95) return "shop";
+    return "normal";
+  }
+
+  function makeFallbackEnemyData(floor) {
+    return [
+      {
+        id: "scattered_note",
+        name: "Scattered Note",
+        floors: [1, 2],
+        health: 20 + floor * 4,
+        damage: 5,
+        speed: 58,
+        color: "#a3e635",
+        radius: 15,
+        xp: 25,
+        gold: 10
+      },
+      {
+        id: "wild_variable",
+        name: "Wild Variable",
+        floors: [1, 2, 3, 4],
+        health: 24 + floor * 5,
+        damage: 5,
+        speed: 66,
+        color: "#facc15",
+        radius: 15,
+        xp: 25,
+        gold: 10
+      },
+      {
+        id: "boss_confusion_cloud",
+        name: "Confusion Cloud",
+        boss: true,
+        floors: [1, 2, 3, 4, 5],
+        health: 95 + floor * 22,
+        damage: 7,
+        speed: 48,
+        color: "#fb7185",
+        radius: 24,
+        xp: 75,
+        gold: 40
+      }
+    ];
+  }
+
+  function normalizeEnemyList(rawEnemyData, floor) {
+    if (Array.isArray(rawEnemyData)) {
+      return rawEnemyData;
+    }
+
+    if (rawEnemyData && typeof rawEnemyData === "object") {
+      const floorKey = String(floor);
+      const candidates = rawEnemyData[floorKey] || rawEnemyData[`floor${floor}`] || rawEnemyData[`floor_${floor}`] || rawEnemyData.enemies || rawEnemyData.types;
+      if (Array.isArray(candidates)) {
+        return candidates;
+      }
+
+      const objectValues = Object.keys(rawEnemyData)
+        .filter((key) => typeof rawEnemyData[key] === "object")
+        .map((key) => ({ id: key, ...rawEnemyData[key] }));
+
+      if (objectValues.length > 0) {
+        return objectValues;
+      }
+    }
+
+    return makeFallbackEnemyData(floor);
+  }
+
+  function enemyAllowedOnFloor(enemyType, floor, roomType) {
+    const isBoss = Boolean(enemyType.boss || enemyType.isBoss || enemyType.type === "boss");
+
+    if (roomType === "boss") {
+      return isBoss || /boss/i.test(String(enemyType.id || enemyType.name || ""));
+    }
+
+    if (isBoss) {
+      return false;
+    }
+
+    const floors = enemyType.floors || enemyType.floor || enemyType.availableFloors || enemyType.available_floors;
+    if (Array.isArray(floors)) {
+      return floors.map(Number).includes(Number(floor));
+    }
+
+    const minFloor = safeNumber(enemyType.minFloor ?? enemyType.min_floor, 1);
+    const maxFloor = safeNumber(enemyType.maxFloor ?? enemyType.max_floor, 5);
+    return floor >= minFloor && floor <= maxFloor;
+  }
+
+  function chooseEnemyType(enemyTypes, floor, roomType, slot) {
+    const allowed = enemyTypes.filter((enemyType) => enemyAllowedOnFloor(enemyType, floor, roomType));
+    const pool = allowed.length > 0 ? allowed : enemyTypes;
+    if (pool.length === 0) {
+      return makeFallbackEnemyData(floor)[0];
+    }
+
+    const index = Math.abs((floor * 31 + slot * 17 + roomType.length * 13) % pool.length);
+    return pool[index];
+  }
+
+  class Room {
+    constructor(floor = 1, roomNumber = 1, options = {}) {
+      this.version = ROOM_VERSION;
+      this.floor = clamp(safeNumber(floor, 1), 1, 5);
+      this.roomNumber = clamp(safeNumber(roomNumber, 1), 1, ROOMS_PER_FLOOR);
+      this.roomIndex = this.roomNumber - 1;
+
+      const rawFloorData = options.floorData || callLoaderMethod("getFloorData", this.floor);
+      this.floorData = normalizeFloorData(rawFloorData, this.floor);
+      this.floorData.roomsPerFloor = clamp(this.floorData.roomsPerFloor, 1, 99);
+
+      this.width = safeNumber(options.width, this.floorData.width);
+      this.height = safeNumber(options.height, this.floorData.height);
+      this.wallThickness = safeNumber(options.wallThickness, this.floorData.wallThickness);
+      this.difficultyScale = safeNumber(options.difficultyScale, this.floorData.difficultyScale);
+
+      this.type = String(options.type || getRoomType(this.roomNumber, this.floorData)).toLowerCase();
+      this.cleared = this.type === "shop";
+      this.rewardGiven = false;
+      this.started = false;
+      this.clearTimer = this.cleared ? 99 : 0;
+      this.clearDelay = 0.35;
+      this.exitOpen = this.type === "shop";
+      this.exitUsed = false;
+      this.feedbackTexts = [];
+
+      this.exitDoor = this.generateExitDoor();
+      this.safeZones = this.generateSafeZones();
+      this.walls = this.generateWalls();
+      this.enemies = [];
+      this.spawnEnemies(options.enemyData);
+
+      if (this.type === "shop") {
+        this.addFeedback("SHOP - Exit is open", this.width / 2, this.height / 2 - 80, "#facc15");
+      }
+    }
+
+    static roomsPerFloor() {
+      return ROOMS_PER_FLOOR;
+    }
+
+    static difficultyScaleForFloor(floor) {
+      return getDifficultyScale(floor);
+    }
+
+    generateExitDoor() {
+      const doorWidth = 92;
+      const doorHeight = 54;
+      return {
+        x: this.width / 2 - doorWidth / 2,
+        y: this.wallThickness - 8,
+        width: doorWidth,
+        height: doorHeight,
+        type: "exit",
+        open: false
+      };
+    }
+
+    generateSafeZones() {
+      const spawn = this.getPlayerSpawnPoint("bottom");
+      const exit = this.exitDoor;
+      return [
+        {
+          x: spawn.x - 86,
+          y: spawn.y - 72,
+          width: 172,
+          height: 122,
+          type: "safe_spawn"
+        },
+        {
+          x: exit.x - 26,
+          y: 0,
+          width: exit.width + 52,
+          height: this.wallThickness + 96,
+          type: "safe_exit"
         }
+      ];
+    }
 
-        let count;
-        if (this.roomType === 'boss') {
-            count = 1; // single boss enemy (placeholder until boss class is built)
-        } else if (this.roomType === 'locked_mystery') {
-            count = 3 + Math.floor(Math.random() * 3); // 3-5 harder enemies
+    getPlayerSpawnPoint(entrySide = "bottom") {
+      const margin = this.wallThickness + 48;
+      const bottomPoint = {
+        x: this.width / 2,
+        y: this.height - margin
+      };
+
+      const points = [
+        bottomPoint,
+        { x: this.width / 2 - 120, y: this.height - margin },
+        { x: this.width / 2 + 120, y: this.height - margin },
+        { x: this.width / 2, y: this.height - margin - 90 },
+        { x: this.width / 2 - 160, y: this.height - margin - 90 },
+        { x: this.width / 2 + 160, y: this.height - margin - 90 }
+      ];
+
+      if (entrySide === "top" || entrySide === "exit_door") {
+        points.unshift({ x: this.width / 2, y: this.wallThickness + 96 });
+      }
+
+      for (const point of points) {
+        const testRect = { x: point.x - 18, y: point.y - 18, width: 36, height: 36 };
+        if (!this.walls || !this.rectCollidesWithWalls(testRect)) {
+          return point;
+        }
+      }
+
+      return bottomPoint;
+    }
+
+    wallOverlapsSafeZone(wall) {
+      if (!Array.isArray(this.safeZones)) return false;
+      return this.safeZones.some((zone) => rectsOverlap(wall, zone));
+    }
+
+    filterUnsafeObstacles(obstacles) {
+      return obstacles.filter((obstacle) => !this.wallOverlapsSafeZone(obstacle));
+    }
+
+    generateWalls() {
+      const t = this.wallThickness;
+      const w = this.width;
+      const h = this.height;
+      const door = this.exitDoor;
+
+      const walls = [
+        { x: 0, y: 0, width: door.x, height: t, type: "wall" },
+        { x: door.x + door.width, y: 0, width: w - (door.x + door.width), height: t, type: "wall" },
+        { x: 0, y: h - t, width: w, height: t, type: "wall" },
+        { x: 0, y: 0, width: t, height: h, type: "wall" },
+        { x: w - t, y: 0, width: t, height: h, type: "wall" }
+      ];
+
+      const layout = this.getLayoutName();
+
+      if (this.type === "shop") {
+        walls.push(...this.makeShopObstacles());
+      } else if (this.type === "boss") {
+        walls.push(...this.makeBossObstacles());
+      } else if (this.type === "secret") {
+        walls.push(...this.makeSecretObstacles());
+      } else if (layout === "cross") {
+        walls.push(...this.makeCrossObstacles());
+      } else if (layout === "lanes") {
+        walls.push(...this.makeLaneObstacles());
+      } else if (layout === "islands") {
+        walls.push(...this.makeIslandObstacles());
+      } else {
+        walls.push(...this.makeScatteredObstacles());
+      }
+
+      const boundaryWalls = walls.filter((wall) => wall.type === "wall");
+      const obstacles = walls.filter((wall) => wall.type !== "wall");
+      return boundaryWalls.concat(this.filterUnsafeObstacles(obstacles));
+    }
+
+    getLayoutName() {
+      const layouts = ["scattered", "cross", "lanes", "islands"];
+      const index = Math.abs((this.floor * 11 + this.roomNumber * 7) % layouts.length);
+      return layouts[index];
+    }
+
+    makeLabBench(x, y, width, height, label) {
+      return {
+        x,
+        y,
+        width,
+        height,
+        type: label || "lab_bench"
+      };
+    }
+
+    makeScatteredObstacles() {
+      const w = this.width;
+      const h = this.height;
+      return [
+        this.makeLabBench(w * 0.25, h * 0.28, 118, 34, "lab_bench"),
+        this.makeLabBench(w * 0.62, h * 0.34, 132, 34, "supply_crate"),
+        this.makeLabBench(w * 0.32, h * 0.68, 150, 34, "broken_machine"),
+        this.makeLabBench(w * 0.66, h * 0.66, 88, 54, "data_terminal")
+      ];
+    }
+
+    makeCrossObstacles() {
+      const w = this.width;
+      const h = this.height;
+      return [
+        this.makeLabBench(w * 0.5 - 22, h * 0.23, 44, 118, "vertical_barrier"),
+        this.makeLabBench(w * 0.5 - 22, h * 0.58, 44, 118, "vertical_barrier"),
+        this.makeLabBench(w * 0.25, h * 0.5 - 18, 142, 36, "horizontal_barrier"),
+        this.makeLabBench(w * 0.61, h * 0.5 - 18, 142, 36, "horizontal_barrier")
+      ];
+    }
+
+    makeLaneObstacles() {
+      const w = this.width;
+      const h = this.height;
+      return [
+        this.makeLabBench(w * 0.24, h * 0.25, 42, h * 0.34, "shelf"),
+        this.makeLabBench(w * 0.47, h * 0.41, 42, h * 0.34, "shelf"),
+        this.makeLabBench(w * 0.70, h * 0.25, 42, h * 0.34, "shelf")
+      ];
+    }
+
+    makeIslandObstacles() {
+      const w = this.width;
+      const h = this.height;
+      return [
+        this.makeLabBench(w * 0.28, h * 0.28, 86, 70, "island_table"),
+        this.makeLabBench(w * 0.62, h * 0.28, 86, 70, "island_table"),
+        this.makeLabBench(w * 0.28, h * 0.62, 86, 70, "island_table"),
+        this.makeLabBench(w * 0.62, h * 0.62, 86, 70, "island_table")
+      ];
+    }
+
+    makeSecretObstacles() {
+      const w = this.width;
+      const h = this.height;
+      return [
+        this.makeLabBench(w * 0.5 - 110, h * 0.5 - 14, 220, 28, "secret_wall"),
+        this.makeLabBench(w * 0.5 - 14, h * 0.5 - 110, 28, 220, "secret_wall"),
+        this.makeLabBench(w * 0.18, h * 0.24, 74, 52, "hidden_cache"),
+        this.makeLabBench(w * 0.74, h * 0.68, 74, 52, "hidden_cache")
+      ];
+    }
+
+    makeBossObstacles() {
+      const w = this.width;
+      const h = this.height;
+      return [
+        this.makeLabBench(w * 0.18, h * 0.22, 112, 38, "boss_cover"),
+        this.makeLabBench(w * 0.70, h * 0.22, 112, 38, "boss_cover"),
+        this.makeLabBench(w * 0.18, h * 0.72, 112, 38, "boss_cover"),
+        this.makeLabBench(w * 0.70, h * 0.72, 112, 38, "boss_cover"),
+        this.makeLabBench(w * 0.5 - 38, h * 0.5 - 38, 76, 76, "reactor_core")
+      ];
+    }
+
+    makeShopObstacles() {
+      const w = this.width;
+      const h = this.height;
+      return [
+        this.makeLabBench(w * 0.5 - 150, h * 0.42, 300, 42, "shop_counter"),
+        this.makeLabBench(w * 0.24, h * 0.66, 76, 52, "supply_crate"),
+        this.makeLabBench(w * 0.68, h * 0.66, 76, 52, "supply_crate")
+      ];
+    }
+
+    getEnemyCount() {
+      if (this.type === "shop") return 0;
+      if (this.type === "boss") return 1;
+
+      const min = Math.max(1, Math.round(this.floorData.enemyCountMin));
+      const max = Math.max(min, Math.round(this.floorData.enemyCountMax));
+      const floorBonus = Math.floor((this.floor - 1) / 2);
+      const roomBonus = this.roomNumber > 8 ? 1 : 0;
+      const base = min + ((this.floor * 7 + this.roomNumber * 5) % (max - min + 1));
+      const typeBonus = this.type === "secret" ? 1 : 0;
+      return clamp(Math.round((base + floorBonus + roomBonus + typeBonus) * this.floorData.spawnRate), 1, 8);
+    }
+
+    getSpawnPoint(index, total) {
+      const margin = this.wallThickness + 90;
+      const usableWidth = this.width - margin * 2;
+      const usableHeight = this.height - margin * 2;
+
+      for (let attempt = 0; attempt < 24; attempt += 1) {
+        const angle = ((Math.PI * 2) / Math.max(1, total)) * index + (this.floor * 0.4) + attempt * 0.31;
+        const ringX = Math.cos(angle) * usableWidth * (0.26 + (attempt % 3) * 0.05);
+        const ringY = Math.sin(angle) * usableHeight * (0.26 + (attempt % 4) * 0.04);
+        const jitterX = (((this.floor * 19 + this.roomNumber * 11 + index * 23 + attempt * 5) % 41) - 20);
+        const jitterY = (((this.floor * 17 + this.roomNumber * 13 + index * 29 + attempt * 7) % 41) - 20);
+        const point = {
+          x: clamp(this.width * 0.5 + ringX + jitterX, margin, this.width - margin),
+          y: clamp(this.height * 0.5 + ringY + jitterY, margin, this.height - margin)
+        };
+
+        const testRect = { x: point.x - 22, y: point.y - 22, width: 44, height: 44 };
+        const tooCloseToCenter = Math.hypot(point.x - this.width / 2, point.y - this.height / 2) < 105;
+        if (!tooCloseToCenter && !this.rectCollidesWithWalls(testRect)) {
+          return point;
+        }
+      }
+
+      return {
+        x: clamp(this.width * 0.5 + 180 + index * 28, margin, this.width - margin),
+        y: clamp(this.height * 0.5 + 80, margin, this.height - margin)
+      };
+    }
+
+    rectCollidesWithWalls(rect) {
+      return this.walls.some((wall) => rectsOverlap(rect, wall));
+    }
+
+    spawnEnemies(enemyDataOverride) {
+      this.enemies = [];
+
+      if (!window.Enemy) {
+        console.warn("[Room] Enemy class is missing. Make sure src/js/enemy.js loads before src/js/room.js.");
+        return;
+      }
+
+      const rawEnemyData = enemyDataOverride || callLoaderMethod("getEnemyData", this.floor);
+      const enemyTypes = normalizeEnemyList(rawEnemyData, this.floor);
+      const count = this.getEnemyCount();
+
+      for (let i = 0; i < count; i += 1) {
+        const enemyType = chooseEnemyType(enemyTypes, this.floor, this.type, i);
+        const spawn = this.getSpawnPoint(i, count);
+        const enemy = new window.Enemy(spawn.x, spawn.y, enemyType, {
+          floor: this.floor,
+          roomNumber: this.roomNumber,
+          roomType: this.type,
+          difficultyScale: this.difficultyScale,
+          isBoss: this.type === "boss"
+        });
+        this.enemies.push(enemy);
+      }
+    }
+
+    update(dt, player) {
+      const delta = safeNumber(dt, 0);
+      this.started = true;
+      this.updateFeedback(delta);
+
+      for (const enemy of this.enemies) {
+        if (enemy && typeof enemy.update === "function") {
+          enemy.update(delta, player, this.walls);
+        }
+      }
+
+      this.enemies = this.enemies.filter((enemy) => enemy && !enemy.remove);
+
+      if (!this.cleared && this.getAliveEnemyCount() <= 0) {
+        this.setRoomCleared();
+      }
+
+      if (this.cleared) {
+        this.clearTimer += delta;
+        if (!this.exitOpen && this.clearTimer >= this.clearDelay) {
+          this.exitOpen = true;
+          this.exitDoor.open = true;
+          this.addFeedback("EXIT OPEN", this.exitDoor.x + this.exitDoor.width / 2, this.exitDoor.y + 72, "#67e8f9");
+        }
+      }
+    }
+
+    updateFeedback(dt) {
+      for (const text of this.feedbackTexts) {
+        text.y -= 22 * dt;
+        text.life -= dt;
+      }
+      this.feedbackTexts = this.feedbackTexts.filter((text) => text.life > 0);
+    }
+
+    getAliveEnemyCount() {
+      return this.enemies.filter((enemy) => enemy && !enemy.dead && !enemy.remove).length;
+    }
+
+    setRoomCleared() {
+      if (this.cleared) return;
+      this.cleared = true;
+      this.clearTimer = 0;
+      this.addFeedback("ROOM CLEAR", this.width / 2, this.height / 2 - 120, "#22c55e");
+    }
+
+    isReadyForAdvance() {
+      return this.exitOpen;
+    }
+
+    getExitRect() {
+      return {
+        x: this.exitDoor.x,
+        y: 0,
+        width: this.exitDoor.width,
+        height: this.wallThickness + 42
+      };
+    }
+
+    playerTouchesExit(player) {
+      if (!this.exitOpen || !player || this.exitUsed) {
+        return false;
+      }
+
+      const playerRect = typeof player.getRect === "function"
+        ? player.getRect()
+        : { x: player.x - 12, y: player.y - 12, width: 24, height: 24 };
+
+      return rectsOverlap(playerRect, this.getExitRect());
+    }
+
+    markExitUsed() {
+      this.exitUsed = true;
+    }
+
+    addFeedback(text, x, y, color = "#ffffff") {
+      this.feedbackTexts.push({
+        text,
+        x: safeNumber(x, this.width / 2),
+        y: safeNumber(y, this.height / 2),
+        color,
+        life: 1.15
+      });
+    }
+
+    draw(ctx, camera = { x: 0, y: 0 }) {
+      if (!ctx) return;
+
+      this.drawFloor(ctx, camera);
+      this.drawExit(ctx, camera);
+      this.drawWalls(ctx, camera);
+
+      for (const enemy of this.enemies) {
+        if (enemy && typeof enemy.draw === "function") {
+          enemy.draw(ctx, camera);
+        }
+      }
+
+      this.drawFeedback(ctx, camera);
+    }
+
+    drawFloor(ctx, camera) {
+      const x = -safeNumber(camera.x, 0);
+      const y = -safeNumber(camera.y, 0);
+
+      const floorColors = {
+        normal: "#152033",
+        secret: "#1e1b4b",
+        shop: "#1f2933",
+        boss: "#2a1620"
+      };
+
+      ctx.save();
+      ctx.fillStyle = floorColors[this.type] || floorColors.normal;
+      ctx.fillRect(x, y, this.width, this.height);
+
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.12)";
+      ctx.lineWidth = 1;
+      const gridSize = 40;
+      for (let gx = this.wallThickness; gx < this.width - this.wallThickness; gx += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x + gx, y + this.wallThickness);
+        ctx.lineTo(x + gx, y + this.height - this.wallThickness);
+        ctx.stroke();
+      }
+      for (let gy = this.wallThickness; gy < this.height - this.wallThickness; gy += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x + this.wallThickness, y + gy);
+        ctx.lineTo(x + this.width - this.wallThickness, y + gy);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+      ctx.font = "bold 18px monospace";
+      ctx.fillText(`${this.type.toUpperCase()} ROOM`, x + this.width - 190, y + this.height - 24);
+      ctx.restore();
+    }
+
+    drawExit(ctx, camera) {
+      const door = this.exitDoor;
+      const x = door.x - safeNumber(camera.x, 0);
+      const y = door.y - safeNumber(camera.y, 0);
+
+      ctx.save();
+      ctx.fillStyle = this.exitOpen ? "#164e63" : "#312e81";
+      ctx.strokeStyle = this.exitOpen ? "#67e8f9" : "#818cf8";
+      ctx.lineWidth = 3;
+      ctx.fillRect(x, y, door.width, door.height);
+      ctx.strokeRect(x, y, door.width, door.height);
+
+      ctx.fillStyle = this.exitOpen ? "#a5f3fc" : "#c4b5fd";
+      ctx.font = "bold 13px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(this.exitOpen ? "EXIT" : "LOCKED", x + door.width / 2, y + door.height / 2 + 5);
+
+      if (this.exitOpen) {
+        ctx.globalAlpha = 0.22 + Math.sin(performance.now() / 140) * 0.08;
+        ctx.fillStyle = "#67e8f9";
+        ctx.fillRect(x + 8, y + door.height - 8, door.width - 16, 26);
+      }
+
+      ctx.restore();
+    }
+
+    drawWalls(ctx, camera) {
+      ctx.save();
+
+      for (const wall of this.walls) {
+        const x = wall.x - safeNumber(camera.x, 0);
+        const y = wall.y - safeNumber(camera.y, 0);
+
+        if (wall.type === "wall") {
+          ctx.fillStyle = "#334155";
+          ctx.strokeStyle = "#0f172a";
+        } else if (wall.type === "reactor_core") {
+          ctx.fillStyle = "#7f1d1d";
+          ctx.strokeStyle = "#fecaca";
+        } else if (wall.type === "shop_counter") {
+          ctx.fillStyle = "#92400e";
+          ctx.strokeStyle = "#fbbf24";
+        } else if (wall.type === "hidden_cache") {
+          ctx.fillStyle = "#581c87";
+          ctx.strokeStyle = "#d8b4fe";
         } else {
-            count = 2 + Math.floor(Math.random() * 3); // 2-4 normal
+          ctx.fillStyle = "#475569";
+          ctx.strokeStyle = "#94a3b8";
         }
 
-        for (let i = 0; i < count; i++) {
-            const x = this.bounds.x + 100 + Math.random() * (this.bounds.width  - 200);
-            const y = this.bounds.y + 100 + Math.random() * (this.bounds.height - 200);
-            this.enemies.push(EnemyFactory.createRandomForFloor(this.floor, x, y));
-        }
-
-        if (this.enemies.length === 0) this.cleared = true;
-    }
-
-    // ── Update ───────────────────────────────────────────────────────────────
-
-    update(deltaTime, player) {
-        if (this.clearFlashTimer > 0) this.clearFlashTimer -= deltaTime;
-
-        if (!this.cleared) {
-            this._updateCombat(deltaTime, player);
-
-            if (this.enemies.length === 0) {
-                this.cleared = true;
-                this.clearFlashTimer = 0.5;
-            }
-        }
-
-        // While doors are locked, keep player fully inside bounds.
-        // Once cleared, allow them to walk into any of the 4 door openings.
-        const extra = this.cleared ? DOOR_H : 0;
-        const minX = this.bounds.x - extra;
-        const maxX = this.bounds.x + this.bounds.width  + extra - player.width;
-        const minY = this.bounds.y - extra;
-        const maxY = this.bounds.y + this.bounds.height + extra - player.height;
-
-        player.x = Math.max(minX, Math.min(maxX, player.x));
-        player.y = Math.max(minY, Math.min(maxY, player.y));
-    }
-
-    _updateCombat(deltaTime, player) {
-        this.enemies.forEach(e => e.update(deltaTime, player, this.bounds));
-
-        // Player-enemy contact
-        this.enemies.forEach(enemy => {
-            if (!enemy.isAlive) return;
-            if (this._rectsOverlap(
-                { x: player.x, y: player.y, width: player.width, height: player.height },
-                enemy.getBounds()
-            )) {
-                player.takeDamage(1);
-            }
-        });
-
-        // Player projectiles vs enemies
-        player.projectiles.forEach(proj => {
-            if (!proj.isAlive) return;
-            this.enemies.forEach(enemy => {
-                if (!enemy.isAlive) return;
-                if (this._rectsOverlap(proj.getBounds(), enemy.getBounds())) {
-                    enemy.takeDamage(proj.damage * player.damageMultiplier);
-                    proj.isAlive = false;
-                }
-            });
-        });
-
-        // Enemy projectiles vs player
-        this.enemies.forEach(enemy => {
-            enemy.projectiles.forEach(proj => {
-                if (!proj.isAlive) return;
-                if (this._rectsOverlap(proj.getBounds(),
-                    { x: player.x, y: player.y, width: player.width, height: player.height }
-                )) {
-                    player.takeDamage(proj.damage);
-                    proj.isAlive = false;
-                }
-            });
-        });
-
-        this.enemies = this.enemies.filter(e => e.isAlive);
-    }
-
-    _rectsOverlap(a, b) {
-        return !(a.x + a.width < b.x || b.x + b.width < a.x ||
-                 a.y + a.height < b.y || b.y + b.height < a.y);
-    }
-
-    isCleared() { return this.cleared; }
-
-    // ── Draw ─────────────────────────────────────────────────────────────────
-
-    draw(ctx) {
-        const { bg, wall: wallColor, floor: floorColor, accent } = this.palette;
-        const { x, y, width, height } = this.bounds;
-        const cx = this.canvas.width;
-        const cy = this.canvas.height;
-
-        // ── Background ──────────────────────────────────────────────────────
-        ctx.fillStyle = bg;
-        ctx.fillRect(0, 0, cx, cy);
-
-        // ── Floor area ──────────────────────────────────────────────────────
-        ctx.fillStyle = floorColor;
-        ctx.fillRect(x, y, width, height);
-
-        // Subtle tile grid
-        ctx.strokeStyle = wallColor + '44';
-        ctx.lineWidth = 0.5;
-        for (let tx = x; tx <= x + width; tx += TILE) {
-            ctx.beginPath(); ctx.moveTo(tx, y); ctx.lineTo(tx, y + height); ctx.stroke();
-        }
-        for (let ty = y; ty <= y + height; ty += TILE) {
-            ctx.beginPath(); ctx.moveTo(x, ty); ctx.lineTo(x + width, ty); ctx.stroke();
-        }
-
-        // ── Walls (solid slabs covering all 4 sides) ─────────────────────────
-        ctx.fillStyle = wallColor;
-        ctx.fillRect(0,         0,         cx,   WALL);           // top
-        ctx.fillRect(0,         y + height, cx,   WALL);           // bottom
-        ctx.fillRect(0,         0,          WALL, cy);             // left
-        ctx.fillRect(x + width, 0,          WALL, cy);             // right
-
-        // ── Door openings ────────────────────────────────────────────────────
-        // All 4 doors open when cleared; entry doors are shown even if first room
-        this._drawDoor(ctx, 'right',  this.cleared,   floorColor, accent, wallColor);
-        this._drawDoor(ctx, 'left',   this.cleared || !this.isFirstRoom, floorColor, accent, wallColor);
-        this._drawDoor(ctx, 'top',    this.cleared,   floorColor, accent, wallColor);
-        this._drawDoor(ctx, 'bottom', this.cleared,   floorColor, accent, wallColor);
-
-        // ── Border accent line ───────────────────────────────────────────────
-        ctx.strokeStyle = accent + '66';
+        ctx.fillRect(x, y, wall.width, wall.height);
         ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, width, height);
+        ctx.strokeRect(x + 1, y + 1, wall.width - 2, wall.height - 2);
 
-        // ── Room type decorations ────────────────────────────────────────────
-        this._drawRoomDecoration(ctx);
-
-        // ── Enemies ──────────────────────────────────────────────────────────
-        this.enemies.forEach(e => e.draw(ctx));
-
-        // ── Clear flash ──────────────────────────────────────────────────────
-        if (this.clearFlashTimer > 0) {
-            const alpha = 0.15 * (this.clearFlashTimer / 0.5);
-            ctx.fillStyle = `rgba(0, 229, 255, ${alpha})`;
-            ctx.fillRect(x, y, width, height);
+        if (wall.type !== "wall") {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+          ctx.fillRect(x + 5, y + 5, Math.max(0, wall.width - 10), 5);
         }
+      }
+
+      ctx.restore();
     }
 
-    _drawDoor(ctx, side, open, floorColor, accent, wallColor) {
-        const { x, y, width, height } = this.bounds;
-        const midX = x + width  / 2;
-        const midY = y + height / 2;
-        const half = DOOR_W / 2;
+    drawFeedback(ctx, camera) {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "bold 16px monospace";
 
-        let gapX, gapY, gapW, gapH, arrowGlyph, arrowX, arrowY;
-        switch (side) {
-            case 'right':
-                gapX = x + width; gapY = midY - half; gapW = WALL; gapH = DOOR_W;
-                arrowGlyph = '▶'; arrowX = gapX + WALL / 2; arrowY = midY; break;
-            case 'left':
-                gapX = x - WALL;  gapY = midY - half; gapW = WALL; gapH = DOOR_W;
-                arrowGlyph = '◀'; arrowX = gapX + WALL / 2; arrowY = midY; break;
-            case 'top':
-                gapX = midX - half; gapY = y - WALL; gapW = DOOR_W; gapH = WALL;
-                arrowGlyph = '▲'; arrowX = midX; arrowY = gapY + WALL / 2; break;
-            case 'bottom':
-                gapX = midX - half; gapY = y + height; gapW = DOOR_W; gapH = WALL;
-                arrowGlyph = '▼'; arrowX = midX; arrowY = gapY + WALL / 2; break;
-        }
+      for (const text of this.feedbackTexts) {
+        ctx.globalAlpha = clamp(text.life / 1.15, 0, 1);
+        ctx.fillStyle = text.color;
+        ctx.fillText(text.text, text.x - safeNumber(camera.x, 0), text.y - safeNumber(camera.y, 0));
+      }
 
-        if (open) {
-            ctx.fillStyle = floorColor;
-            ctx.fillRect(gapX, gapY, gapW, gapH);
-
-            ctx.fillStyle = accent + 'bb';
-            ctx.font = '20px serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(arrowGlyph, arrowX, arrowY);
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'alphabetic';
-
-            ctx.strokeStyle = accent + '88';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(gapX, gapY, gapW, gapH);
-        } else {
-            ctx.fillStyle = wallColor;
-            ctx.fillRect(gapX, gapY, gapW, gapH);
-
-            ctx.fillStyle = '#ff335577';
-            ctx.font = '14px serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🔒', arrowX, arrowY);
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'alphabetic';
-
-            ctx.strokeStyle = '#ff335544';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(gapX, gapY, gapW, gapH);
-        }
+      ctx.restore();
     }
+  }
 
-    _drawRoomDecoration(ctx) {
-        const { x, y, width, height } = this.bounds;
-        const { accent } = this.palette;
-
-        const labels = {
-            start:          { icon: '🎓', text: 'START',       color: '#88ffaa' },
-            normal:         { icon: '⚔️',  text: `ROOM ${this.roomIndex}/${this.totalRooms}`, color: accent },
-            secret:         { icon: '❓',  text: 'SECRET ROOM', color: '#ffcc44' },
-            shop:           { icon: '🛒',  text: 'SHOP',        color: '#44ffcc' },
-            boss:           { icon: '⚠️',  text: 'BOSS',        color: '#ff4444' },
-            marked_door:    { icon: '📦',  text: 'RARE CHEST',  color: '#cc88ff' },
-            locked_shop:    { icon: '🛒',  text: 'SHOP (LOCKED)', color: '#44ffcc' },
-            locked_mystery: { icon: '🎲',  text: 'MYSTERY',     color: '#ff8844' },
-        };
-
-        const info = labels[this.roomType] ?? labels.normal;
-
-        // Room label top-left
-        ctx.fillStyle = info.color + 'bb';
-        ctx.font = 'bold 11px Courier New';
-        ctx.fillText(`${info.icon} ${info.text}`, x + 10, y + 18);
-
-        // For boss room: large warning in center background
-        if (this.roomType === 'boss' && this.enemies.length > 0) {
-            ctx.fillStyle = '#ff444411';
-            ctx.fillRect(x, y, width, height);
-            ctx.fillStyle = '#ff444433';
-            ctx.font = 'bold 80px serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('⚠️', x + width / 2, y + height / 2);
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'alphabetic';
-        }
-
-        // For shop room: simple visual indicator
-        if (this.roomType === 'shop' || this.roomType === 'locked_shop') {
-            ctx.fillStyle = '#44ffcc11';
-            ctx.fillRect(x, y, width, height);
-            ctx.fillStyle = '#44ffcc22';
-            ctx.font = '60px serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🛒', x + width / 2, y + height / 2);
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'alphabetic';
-        }
-
-        // For secret: subtle glow
-        if (this.roomType === 'secret') {
-            ctx.fillStyle = '#ffcc4411';
-            ctx.fillRect(x, y, width, height);
-        }
-
-        // Progress dots along the top wall
-        this._drawProgressDots(ctx);
-    }
-
-    _drawProgressDots(ctx) {
-        const total = this.totalRooms;
-        const dotR = 4;
-        const spacing = 14;
-        const startX = this.canvas.width / 2 - ((total - 1) * spacing) / 2;
-        const dotY = WALL / 2; // center of top wall (HUD is now outside canvas)
-
-        for (let i = 0; i < total; i++) {
-            const roomNum = i + 1;
-            const isCurrent = roomNum === this.roomIndex;
-
-            const type = this.floorMap.typeAt(roomNum);
-            let color;
-            if (type === 'boss')                              color = '#ff4444';
-            else if (type === 'shop' || type === 'locked_shop') color = '#44ffcc';
-            else if (type === 'secret')                       color = '#ffcc44';
-            else if (type === 'marked_door')                  color = '#cc88ff';
-            else                                              color = '#4488cc';
-
-            ctx.beginPath();
-            ctx.arc(startX + i * spacing, dotY, isCurrent ? dotR + 2 : dotR, 0, Math.PI * 2);
-            ctx.fillStyle = isCurrent ? '#ffffff' : color + '99';
-            ctx.fill();
-
-            if (isCurrent) {
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-        }
-    }
-
-    _getPalette(floor) {
-        const palettes = {
-            1: { bg: '#0f1425', wall: '#1a2035', floor: '#12192e', accent: '#00e5ff' },
-            2: { bg: '#1a1208', wall: '#2a1e0a', floor: '#1a1508', accent: '#d4a040' },
-            3: { bg: '#081820', wall: '#0a2535', floor: '#081c28', accent: '#00aaff' },
-            4: { bg: '#0a0a18', wall: '#151525', floor: '#0c0c1c', accent: '#cc88ff' },
-            5: { bg: '#080810', wall: '#181820', floor: '#0a0a14', accent: '#ff6040' },
-        };
-        return palettes[floor] ?? palettes[1];
-    }
-}
+  Room.VERSION = ROOM_VERSION;
+  Room.ROOMS_PER_FLOOR = ROOMS_PER_FLOOR;
+  window.Room = Room;
+})();

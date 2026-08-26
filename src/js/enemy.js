@@ -1,385 +1,395 @@
-// enemy.js - Enemy base class and Floor 1 enemy implementations
+/**
+ * The Lab - Enemy System
+ * Version: 1.0.22
+ *
+ * File: src/js/enemy.js
+ * Replacement: Replace the whole file
+ * Purpose:
+ * - Create enemies from docs/enemies.json compatible data
+ * - Move enemies toward the player with simple chase pathing
+ * - Handle idle, chase, attack, and flee states
+ * - Take projectile damage, dispatch death events, and award loot hooks
+ *
+ * TESTING CHECKLIST:
+ * □ Start game, enter floor 1 room 1
+ * □ 2-3 enemies should appear
+ * □ Move toward enemies (no collision should stop you)
+ * □ Shoot enemies (damage text appears)
+ * □ Enemies die and drop loot (gold/xp text appears)
+ * □ Low-health non-boss enemies briefly flee instead of only chasing
+ * □ Room clears, advance to room 2
+ * □ After 13 rooms, advance to floor 2
+ * □ Enemies are tougher on floor 2
+ * □ Reaching floor 5, defeat final boss = victory screen
+ * □ HP can reach 0 = game over screen
+ */
 
-class Enemy {
-    constructor(x, y, data) {
-        this.x = x;
-        this.y = y;
-        this.id = data.id;
-        this.name = data.name;
-        this.icon = data.icon ?? '👾';
-        this.width = 32;
-        this.height = 32;
-        this.health = data.health ?? 20;
-        this.maxHealth = this.health;
+(function () {
+  "use strict";
 
-        // Base movement
-        this.vx = 0;
-        this.vy = 0;
-        this.speed = data.speed ?? 1;
+  const ENEMY_VERSION = "1.0.22";
 
-        this.isAlive = true;
-        this.flashTimer = 0; // red flash on hit
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
 
-        // Attack
-        this.attackCooldown = 0;
-        this.attackRate = data.attackRate ?? 1.5; // seconds between attacks
-        this.projectiles = [];
+  function safeNumber(value, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  }
 
-        // Behaviour state
-        this.stateTimer = 0;
-        this.state = 'idle'; // idle, chasing, attacking
+  function rectsOverlap(a, b) {
+    return (
+      a.x < b.x + b.width &&
+      a.x + a.width > b.x &&
+      a.y < b.y + b.height &&
+      a.y + a.height > b.y
+    );
+  }
+
+  function circleRectOverlap(cx, cy, radius, rect) {
+    const nearestX = clamp(cx, rect.x, rect.x + rect.width);
+    const nearestY = clamp(cy, rect.y, rect.y + rect.height);
+    const dx = cx - nearestX;
+    const dy = cy - nearestY;
+    return dx * dx + dy * dy <= radius * radius;
+  }
+
+  function getDifficultyScale(floor) {
+    const safeFloor = clamp(safeNumber(floor, 1), 1, 5);
+    return 1 + ((safeFloor - 1) * 0.125);
+  }
+
+  function readStat(data, names, fallback) {
+    for (const name of names) {
+      if (data && data[name] !== undefined) {
+        return safeNumber(data[name], fallback);
+      }
+    }
+    return fallback;
+  }
+
+  class Enemy {
+    constructor(x, y, typeData = {}, options = {}) {
+      const data = typeData && typeof typeData === "object" ? typeData : {};
+
+      this.version = ENEMY_VERSION;
+      this.id = String(data.id || data.key || data.name || "enemy").toLowerCase().replace(/\s+/g, "_");
+      this.name = String(data.name || data.label || this.id.replace(/_/g, " "));
+      this.x = safeNumber(x, data.x ?? 0);
+      this.y = safeNumber(y, data.y ?? 0);
+      this.spawnX = this.x;
+      this.spawnY = this.y;
+
+      this.floor = clamp(safeNumber(options.floor, data.floor ?? 1), 1, 5);
+      this.roomNumber = safeNumber(options.roomNumber, 1);
+      this.roomType = String(options.roomType || data.roomType || "normal");
+      this.isBoss = Boolean(options.isBoss || data.boss || data.isBoss || data.type === "boss");
+      this.difficultyScale = safeNumber(options.difficultyScale, getDifficultyScale(this.floor));
+
+      this.radius = readStat(data, ["radius", "size", "hitRadius", "hit_radius"], this.isBoss ? 24 : 15);
+      this.width = readStat(data, ["width", "w"], this.radius * 2);
+      this.height = readStat(data, ["height", "h"], this.radius * 2);
+
+      const baseHealth = readStat(data, ["health", "hp", "maxHealth", "max_health", "maxHp"], this.isBoss ? 120 : 28);
+      const baseDamage = readStat(data, ["damage", "contactDamage", "contact_damage", "attack", "atk"], 5);
+
+      this.maxHealth = Math.round(baseHealth * this.difficultyScale * (this.isBoss ? 1.15 : 1));
+      this.health = this.maxHealth;
+      this.hp = this.health;
+      this.damage = Math.max(1, Math.round(baseDamage * this.difficultyScale));
+      this.contactDamage = this.damage;
+
+      this.speed = readStat(data, ["speed", "moveSpeed", "move_speed"], this.isBoss ? 48 : 64);
+      this.chaseRange = readStat(data, ["chaseRange", "chase_range", "aggroRange", "aggro_range"], 420);
+      this.attackRange = readStat(data, ["attackRange", "attack_range"], this.radius + 18);
+      this.attackCooldownDuration = readStat(data, ["attackCooldown", "attack_cooldown", "contactCooldown", "contact_cooldown"], 0.5);
+      this.attackCooldown = 0;
+
+      this.fleeThreshold = this.isBoss ? 0 : readStat(data, ["fleeThreshold", "flee_threshold", "fleeAtHealthPercent"], 0.25);
+      this.fleeSpeedMultiplier = readStat(data, ["fleeSpeedMultiplier", "flee_speed_multiplier"], 1.18);
+
+      this.xpValue = readStat(data, ["xp", "xpValue", "xp_value", "experience"], this.isBoss ? 75 : 25);
+      this.goldValue = readStat(data, ["gold", "goldValue", "gold_value"], this.isBoss ? 40 : 10);
+      this.lootTable = data.lootTable || data.loot_table || data.loot || null;
+
+      this.state = "idle";
+      this.dead = false;
+      this.remove = false;
+      this.deathTimer = 0;
+      this.removeDelay = 0.25;
+      this.hitFlashTimer = 0;
+      this.hitFlashDuration = 0.1;
+      this.damageTexts = [];
+      this.lastHitBy = null;
+
+      this.color = data.color || (this.isBoss ? "#fb7185" : "#facc15");
+      this.outlineColor = data.outlineColor || data.outline_color || "#111827";
     }
 
-    update(deltaTime, player, roomBounds) {
-        if (!this.isAlive) return;
+    update(dt, player, walls = []) {
+      const delta = safeNumber(dt, 0);
+      this.attackCooldown = Math.max(0, this.attackCooldown - delta);
+      this.hitFlashTimer = Math.max(0, this.hitFlashTimer - delta);
+      this.updateDamageTexts(delta);
 
-        this.flashTimer = Math.max(0, this.flashTimer - deltaTime);
-        this.attackCooldown = Math.max(0, this.attackCooldown - deltaTime);
-        this.stateTimer += deltaTime;
+      if (this.dead) {
+        this.deathTimer += delta;
+        if (this.deathTimer >= this.removeDelay) {
+          this.remove = true;
+        }
+        return;
+      }
 
-        this.updateBehaviour(deltaTime, player, roomBounds);
+      if (!player || player.dead || player.isDead) {
+        this.state = "idle";
+        return;
+      }
 
-        // Move
-        this.x += this.vx;
-        this.y += this.vy;
+      const dx = player.x - this.x;
+      const dy = player.y - this.y;
+      const distance = Math.hypot(dx, dy) || 1;
 
-        // Clamp to room
-        this.x = Math.max(roomBounds.x, Math.min(roomBounds.x + roomBounds.width - this.width, this.x));
-        this.y = Math.max(roomBounds.y, Math.min(roomBounds.y + roomBounds.height - this.height, this.y));
+      const healthPercent = this.maxHealth > 0 ? this.health / this.maxHealth : 1;
 
-        // Update projectiles
-        this.projectiles = this.projectiles.filter(p => {
-            p.update(deltaTime);
-            return p.isAlive;
+      if (!this.isBoss && healthPercent <= this.fleeThreshold && distance <= this.chaseRange * 0.85) {
+        this.state = "flee";
+        this.moveAwayFrom(dx / distance, dy / distance, delta, walls);
+      } else if (distance <= this.attackRange + safeNumber(player.radius, 12)) {
+        this.state = "attack";
+        this.attack(player);
+      } else if (distance <= this.chaseRange) {
+        this.state = "chase";
+        this.moveToward(dx / distance, dy / distance, delta, walls);
+      } else {
+        this.state = "idle";
+      }
+
+      this.hp = this.health;
+    }
+
+    moveToward(nx, ny, dt, walls) {
+      const amount = this.speed * dt;
+      const oldX = this.x;
+      const oldY = this.y;
+
+      this.x += nx * amount;
+      if (this.collidesWithWalls(walls)) {
+        this.x = oldX;
+        this.y += Math.sign(ny || 1) * amount * 0.75;
+        if (this.collidesWithWalls(walls)) {
+          this.y = oldY;
+        }
+      }
+
+      this.y += ny * amount;
+      if (this.collidesWithWalls(walls)) {
+        this.y = oldY;
+        this.x += Math.sign(nx || 1) * amount * 0.75;
+        if (this.collidesWithWalls(walls)) {
+          this.x = oldX;
+        }
+      }
+    }
+
+    moveAwayFrom(nx, ny, dt, walls) {
+      const originalSpeed = this.speed;
+      this.speed = originalSpeed * this.fleeSpeedMultiplier;
+      this.moveToward(-nx, -ny, dt, walls);
+      this.speed = originalSpeed;
+    }
+
+    collidesWithWalls(walls) {
+      if (!Array.isArray(walls)) return false;
+      for (const wall of walls) {
+        if (circleRectOverlap(this.x, this.y, this.radius, wall)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    attack(player) {
+      if (this.attackCooldown > 0) return;
+      this.attackCooldown = this.attackCooldownDuration;
+
+      if (player && typeof player.takeDamage === "function") {
+        player.takeDamage(this.contactDamage, {
+          type: "enemy_contact",
+          enemy: this,
+          enemyId: this.id
         });
+      } else if (player && typeof player.health === "number") {
+        player.health = Math.max(0, player.health - this.contactDamage);
+        player.hp = player.health;
+      }
     }
 
-    // Override in subclasses
-    updateBehaviour(deltaTime, player, roomBounds) {
-        this.chasePlayer(player, this.speed);
+    takeDamage(amount, source = {}) {
+      if (this.dead || this.remove) return 0;
+
+      const incoming = Math.max(0, safeNumber(amount, 0));
+      if (incoming <= 0) return 0;
+
+      this.health = Math.max(0, this.health - incoming);
+      this.hp = this.health;
+      this.hitFlashTimer = this.hitFlashDuration;
+      this.lastHitBy = source;
+      this.addDamageText(`-${Math.round(incoming)}`, "#ffffff");
+
+      if (this.health <= 0) {
+        this.die(source);
+      }
+
+      return incoming;
     }
 
-    chasePlayer(player, speed) {
-        const dx = (player.x + player.width / 2) - (this.x + this.width / 2);
-        const dy = (player.y + player.height / 2) - (this.y + this.height / 2);
-        const dist = Math.hypot(dx, dy);
-        if (dist > 0) {
-            this.vx = (dx / dist) * speed;
-            this.vy = (dy / dist) * speed;
-        }
+    addDamageText(text, color) {
+      this.damageTexts.push({
+        text,
+        x: this.x,
+        y: this.y - this.radius - 10,
+        life: 0.65,
+        color: color || "#ffffff"
+      });
     }
 
-    distToPlayer(player) {
-        const dx = (player.x + player.width / 2) - (this.x + this.width / 2);
-        const dy = (player.y + player.height / 2) - (this.y + this.height / 2);
-        return Math.hypot(dx, dy);
+    updateDamageTexts(dt) {
+      for (const text of this.damageTexts) {
+        text.y -= 28 * dt;
+        text.life -= dt;
+      }
+      this.damageTexts = this.damageTexts.filter((text) => text.life > 0);
     }
 
-    fireAt(player, speed = 4, damage = 3) {
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
-        const dx = (player.x + player.width / 2) - cx;
-        const dy = (player.y + player.height / 2) - cy;
-        const d = Math.hypot(dx, dy);
-        if (d === 0) return;
-        this.projectiles.push(new EnemyProjectile(cx, cy, (dx / d) * speed, (dy / d) * speed, damage));
+    die(source = {}) {
+      if (this.dead) return;
+      this.dead = true;
+      this.health = 0;
+      this.hp = 0;
+      this.deathTimer = 0;
+      this.state = "dead";
+      this.addDamageText(`+${this.goldValue}g +${this.xpValue}xp`, "#facc15");
+
+      const player = source.player || source.owner || null;
+      if (player) {
+        this.awardLoot(player);
+      }
+
+      const detail = {
+        enemy: this,
+        player,
+        gold: this.goldValue,
+        xp: this.xpValue,
+        lootTable: this.lootTable,
+        source
+      };
+
+      if (source && typeof source.onEnemyDefeated === "function") {
+        source.onEnemyDefeated(detail);
+      }
+
+      if (player && typeof player.onEnemyDefeated === "function") {
+        player.onEnemyDefeated(detail);
+      }
+
+      if (typeof window.dispatchEvent === "function" && typeof window.CustomEvent === "function") {
+        window.dispatchEvent(new CustomEvent("lab:enemyDefeated", { detail }));
+      }
     }
 
-    takeDamage(amount) {
-        this.health -= amount;
-        this.flashTimer = 0.1;
-        if (this.health <= 0) {
-            this.health = 0;
-            this.isAlive = false;
-        }
+    awardLoot(player) {
+      if (!player) return;
+
+      if (typeof player.addGold === "function") {
+        player.addGold(this.goldValue);
+      } else {
+        player.gold = safeNumber(player.gold, 0) + this.goldValue;
+      }
+
+      if (typeof player.addXP === "function") {
+        player.addXP(this.xpValue);
+      } else {
+        player.xp = safeNumber(player.xp, 0) + this.xpValue;
+      }
     }
 
-    getBounds() {
-        return { x: this.x, y: this.y, width: this.width, height: this.height };
-    }
+    draw(ctx, camera = { x: 0, y: 0 }) {
+      if (!ctx || this.remove) return;
 
-    isCollidingWith(bounds) {
-        return !(this.x + this.width < bounds.x || bounds.x + bounds.width < this.x ||
-                 this.y + this.height < bounds.y || bounds.y + bounds.height < this.y);
-    }
+      const alpha = this.dead ? Math.max(0.1, 1 - this.deathTimer / this.removeDelay) : 1;
+      const flashing = this.hitFlashTimer > 0;
 
-    draw(ctx) {
-        if (!this.isAlive) return;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(this.x, this.y);
 
-        // Flash red when hit
-        if (this.flashTimer > 0) {
-            ctx.fillStyle = '#ff4444';
-        } else {
-            ctx.fillStyle = '#cc2244';
-        }
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+      ctx.beginPath();
+      ctx.ellipse(0, this.radius * 0.8, this.radius * 0.85, this.radius * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-        // Icon
-        ctx.font = '20px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(this.icon, this.x + this.width / 2, this.y + this.height / 2);
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = flashing ? "#ffffff" : this.color;
+      ctx.strokeStyle = this.outlineColor;
+      ctx.lineWidth = this.isBoss ? 4 : 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
 
-        // Health bar
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(-this.radius * 0.45, -this.radius * 0.18, this.radius * 0.22, this.radius * 0.22);
+      ctx.fillRect(this.radius * 0.23, -this.radius * 0.18, this.radius * 0.22, this.radius * 0.22);
+
+      if (!this.dead) {
         this.drawHealthBar(ctx);
+      }
 
-        // Draw projectiles
-        this.projectiles.forEach(p => p.draw(ctx));
+      ctx.restore();
+      this.drawDamageTexts(ctx);
     }
 
     drawHealthBar(ctx) {
-        const bw = this.width;
-        const bh = 4;
-        const bx = this.x;
-        const by = this.y - 8;
-        const pct = this.health / this.maxHealth;
+      const width = this.isBoss ? 72 : 42;
+      const height = 6;
+      const y = -this.radius - 14;
+      const percent = this.maxHealth > 0 ? clamp(this.health / this.maxHealth, 0, 1) : 0;
 
-        ctx.fillStyle = '#330000';
-        ctx.fillRect(bx, by, bw, bh);
-        ctx.fillStyle = pct > 0.5 ? '#00cc44' : pct > 0.25 ? '#ffaa00' : '#ff2222';
-        ctx.fillRect(bx, by, bw * pct, bh);
-    }
-}
-
-// ── Enemy Projectile ─────────────────────────────────────────────────────────
-
-class EnemyProjectile {
-    constructor(x, y, vx, vy, damage = 3, color = '#ff6600') {
-        this.x = x;
-        this.y = y;
-        this.vx = vx;
-        this.vy = vy;
-        this.width = 8;
-        this.height = 8;
-        this.damage = damage;
-        this.color = color;
-        this.isAlive = true;
-        this.lifetime = 5;
-        this.age = 0;
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(-width / 2, y, width, height);
+      ctx.fillStyle = this.isBoss ? "#fb7185" : "#22c55e";
+      ctx.fillRect(-width / 2, y, width * percent, height);
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-width / 2, y, width, height);
     }
 
-    update(deltaTime) {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.age += deltaTime;
-        if (this.age > this.lifetime) this.isAlive = false;
+    drawDamageTexts(ctx) {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "bold 14px monospace";
+      for (const text of this.damageTexts) {
+        ctx.globalAlpha = clamp(text.life / 0.65, 0, 1);
+        ctx.fillStyle = text.color;
+        ctx.fillText(text.text, text.x, text.y);
+      }
+      ctx.restore();
     }
 
-    draw(ctx) {
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
-        ctx.fill();
+    getRect() {
+      return {
+        x: this.x - this.radius,
+        y: this.y - this.radius,
+        width: this.radius * 2,
+        height: this.radius * 2
+      };
     }
 
-    getBounds() {
-        return { x: this.x - this.width / 2, y: this.y - this.height / 2, width: this.width, height: this.height };
+    collidesWithRect(rect) {
+      return rectsOverlap(this.getRect(), rect);
     }
-}
+  }
 
-// ── Floor 1 Enemies ──────────────────────────────────────────────────────────
-
-// Runaway Beaker: rolls toward player, accelerates, leaves puddles
-class RunawayBeaker extends Enemy {
-    constructor(x, y) {
-        super(x, y, {
-            id: 'runaway_beaker',
-            name: 'Runaway Beaker',
-            icon: '🧪',
-            health: 25,
-            speed: 1.5,
-        });
-        this.acceleration = 0.04;
-        this.currentSpeed = 0.5;
-        this.puddles = [];
-        this.puddleTimer = 0;
-    }
-
-    updateBehaviour(deltaTime, player, roomBounds) {
-        this.currentSpeed = Math.min(this.currentSpeed + this.acceleration, 4.0);
-        this.chasePlayer(player, this.currentSpeed);
-
-        // Drop puddle trail
-        this.puddleTimer += deltaTime;
-        if (this.puddleTimer > 0.5) {
-            this.puddleTimer = 0;
-            this.puddles.push({
-                x: this.x + this.width / 2 - 12,
-                y: this.y + this.height / 2 - 12,
-                r: 12,
-                lifetime: 4,
-                age: 0,
-            });
-        }
-
-        this.puddles = this.puddles.filter(p => {
-            p.age += deltaTime;
-            return p.age < p.lifetime;
-        });
-    }
-
-    draw(ctx) {
-        // Draw puddles
-        this.puddles.forEach(p => {
-            const alpha = 1 - p.age / p.lifetime;
-            ctx.fillStyle = `rgba(0, 200, 150, ${alpha * 0.4})`;
-            ctx.beginPath();
-            ctx.ellipse(p.x + p.r, p.y + p.r, p.r, p.r * 0.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        super.draw(ctx);
-    }
-}
-
-// Centrifuge: stationary, fires rotating spray of 5 projectiles
-class Centrifuge extends Enemy {
-    constructor(x, y) {
-        super(x, y, {
-            id: 'centrifuge',
-            name: 'Centrifuge',
-            icon: '⚙️',
-            health: 35,
-            speed: 0,
-            attackRate: 1.5,
-        });
-        this.angle = 0;
-        this.rotationSpeed = 1.5; // radians/sec (increases)
-        this.age = 0;
-    }
-
-    updateBehaviour(deltaTime, player, roomBounds) {
-        this.vx = 0;
-        this.vy = 0;
-        this.age += deltaTime;
-        this.rotationSpeed = 1.5 + this.age * 0.03;
-        this.angle += this.rotationSpeed * deltaTime;
-
-        if (this.attackCooldown <= 0) {
-            this.fireSpray();
-            this.attackCooldown = this.attackRate;
-        }
-    }
-
-    fireSpray() {
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
-        for (let i = 0; i < 5; i++) {
-            const a = this.angle + (i / 5) * Math.PI * 2;
-            this.projectiles.push(new EnemyProjectile(cx, cy, Math.cos(a) * 3.5, Math.sin(a) * 3.5, 3, '#00ccff'));
-        }
-    }
-
-    draw(ctx) {
-        super.draw(ctx);
-        // Spinning indicator
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(this.angle);
-        ctx.strokeStyle = '#00ccff55';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(-18, 0);
-        ctx.lineTo(18, 0);
-        ctx.stroke();
-        ctx.restore();
-    }
-}
-
-// Bunsen Burner: stationary, fires wide flame cone every 1.2s
-class BunsenBurner extends Enemy {
-    constructor(x, y) {
-        super(x, y, {
-            id: 'bunsen_burner',
-            name: 'Bunsen Burner',
-            icon: '🔥',
-            health: 30,
-            speed: 0,
-            attackRate: 1.2,
-        });
-        this.flameAngle = 0;
-        this.flameActive = false;
-        this.flameDuration = 0;
-    }
-
-    updateBehaviour(deltaTime, player, roomBounds) {
-        this.vx = 0;
-        this.vy = 0;
-
-        // Track player direction slowly
-        const dx = (player.x + player.width / 2) - (this.x + this.width / 2);
-        const dy = (player.y + player.height / 2) - (this.y + this.height / 2);
-        const targetAngle = Math.atan2(dy, dx);
-        // Lerp angle
-        let diff = targetAngle - this.flameAngle;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        this.flameAngle += diff * deltaTime * 0.8;
-
-        if (this.flameDuration > 0) {
-            this.flameDuration -= deltaTime;
-            this.flameActive = true;
-        } else {
-            this.flameActive = false;
-        }
-
-        if (this.attackCooldown <= 0) {
-            this.flameDuration = 0.35;
-            this.fireCone(player);
-            this.attackCooldown = this.attackRate;
-        }
-    }
-
-    fireCone(player) {
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
-        const spread = Math.PI / 3; // 60 degree arc
-        for (let i = 0; i < 7; i++) {
-            const a = this.flameAngle - spread / 2 + (spread / 6) * i;
-            const speed = 3 + Math.random() * 1.5;
-            this.projectiles.push(new EnemyProjectile(cx, cy, Math.cos(a) * speed, Math.sin(a) * speed, 4, '#ff6600'));
-        }
-    }
-
-    draw(ctx) {
-        if (this.flameActive) {
-            const cx = this.x + this.width / 2;
-            const cy = this.y + this.height / 2;
-            ctx.save();
-            ctx.globalAlpha = 0.35;
-            ctx.fillStyle = '#ff8800';
-            ctx.beginPath();
-            ctx.moveTo(cx, cy);
-            ctx.arc(cx, cy, 70, this.flameAngle - Math.PI / 3, this.flameAngle + Math.PI / 3);
-            ctx.closePath();
-            ctx.fill();
-            ctx.globalAlpha = 1;
-            ctx.restore();
-        }
-        super.draw(ctx);
-    }
-}
-
-// ── Enemy Factory ────────────────────────────────────────────────────────────
-
-const EnemyFactory = {
-    floor1Types: ['runaway_beaker', 'centrifuge', 'bunsen_burner'],
-
-    create(id, x, y) {
-        switch (id) {
-            case 'runaway_beaker': return new RunawayBeaker(x, y);
-            case 'centrifuge':     return new Centrifuge(x, y);
-            case 'bunsen_burner':  return new BunsenBurner(x, y);
-            default:               return new RunawayBeaker(x, y);
-        }
-    },
-
-    createRandomForFloor(floor, x, y) {
-        const pool = this.floor1Types; // expand per floor later
-        const id = pool[Math.floor(Math.random() * pool.length)];
-        return this.create(id, x, y);
-    },
-};
+  Enemy.VERSION = ENEMY_VERSION;
+  window.Enemy = Enemy;
+})();

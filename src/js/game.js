@@ -322,8 +322,8 @@
     }
 
     drawFloorMap() {
-      if (this.floor === 1) {
-        this.drawFirstFloorPixelMap();
+      if (this.floor >= 1 && this.floor <= 5) {
+        this.drawPixelFloorMap(this.floor);
         return;
       }
 
@@ -382,9 +382,9 @@
       ctx.restore();
     }
 
-    drawFirstFloorPixelMap() {
+    drawPixelFloorMap(floor) {
       const ctx = this.ctx;
-      const progress = this.ensureFloorProgress(1);
+      const progress = this.ensureFloorProgress(floor);
       const panelX = this.width - 352;
       const panelY = 10;
       const panelWidth = 338;
@@ -395,37 +395,79 @@
       const mapOriginX = panelX + 32;
       const mapOriginY = panelY + 34;
 
-      const roomPositions = {
-        1: [0, 2],
-        2: [1, 2],
-        3: [2, 2],
-        4: [3, 1],
-        5: [3, 2],
-        6: [3, 3],
-        7: [4, 1],
-        8: [4, 2],
-        9: [4, 3],
-        10: [5, 2],
-        11: [6, 2],
-        12: [7, 2],
-        13: [8, 2]
+      const floorMapConfigs = {
+        1: {
+          label: "F1 LAB",
+          shell: "#0b1124",
+          panel: "#17203a",
+          trim: "#22315e",
+          title: "#dbeafe",
+          link: "#475569",
+          roomPositions: {
+            1: [0, 2], 2: [1, 2], 3: [2, 2], 4: [3, 1], 5: [3, 2], 6: [3, 3], 7: [4, 1], 8: [4, 2], 9: [4, 3], 10: [5, 2], 11: [6, 2], 12: [7, 2], 13: [8, 2]
+          },
+          links: [[1, 2], [2, 3], [3, 4], [3, 5], [3, 6], [4, 7], [5, 8], [6, 9], [7, 10], [8, 10], [9, 10], [10, 11], [11, 12], [12, 13]]
+        },
+        2: {
+          label: "F2 ROCK",
+          shell: "#1f160f",
+          panel: "#312319",
+          trim: "#5b4634",
+          title: "#fde68a",
+          link: "#8b7355",
+          roomPositions: {
+            1: [0, 1], 2: [1, 1], 3: [2, 1], 4: [2, 2], 5: [3, 2], 6: [4, 1], 7: [4, 2], 8: [4, 3], 9: [5, 1], 10: [5, 2], 11: [6, 2], 12: [7, 2], 13: [8, 2]
+          },
+          links: [[1, 2], [2, 3], [3, 4], [4, 5], [3, 6], [4, 7], [5, 8], [6, 9], [7, 10], [8, 10], [9, 11], [10, 11], [11, 12], [12, 13]]
+        },
+        3: {
+          label: "F3 TIDES",
+          shell: "#082032",
+          panel: "#0c3248",
+          trim: "#155e75",
+          title: "#cffafe",
+          link: "#38bdf8",
+          roomPositions: {
+            1: [0, 2], 2: [1, 1], 3: [1, 2], 4: [1, 3], 5: [2, 2], 6: [3, 1], 7: [3, 2], 8: [3, 3], 9: [4, 2], 10: [5, 1], 11: [5, 2], 12: [6, 2], 13: [7, 2]
+          },
+          links: [[1, 3], [2, 3], [3, 4], [3, 5], [5, 6], [5, 7], [5, 8], [6, 9], [7, 9], [8, 9], [9, 10], [9, 11], [11, 12], [12, 13]]
+        },
+        4: {
+          label: "F4 STORM",
+          shell: "#121524",
+          panel: "#1f2438",
+          trim: "#4b5563",
+          title: "#f8fafc",
+          link: "#94a3b8",
+          roomPositions: {
+            1: [0, 2], 2: [1, 2], 3: [2, 1], 4: [2, 3], 5: [3, 1], 6: [3, 2], 7: [3, 3], 8: [4, 0], 9: [4, 2], 10: [4, 4], 11: [5, 2], 12: [6, 2], 13: [7, 2]
+          },
+          links: [[1, 2], [2, 3], [2, 4], [3, 5], [3, 6], [4, 7], [5, 8], [6, 9], [7, 10], [8, 11], [9, 11], [10, 11], [11, 12], [12, 13]]
+        },
+        5: {
+          label: "F5 ORIGIN",
+          shell: "#1b1029",
+          panel: "#2a1542",
+          trim: "#6d28d9",
+          title: "#ede9fe",
+          link: "#a78bfa",
+          roomPositions: {
+            1: [0, 2], 2: [1, 1], 3: [1, 2], 4: [1, 3], 5: [2, 1], 6: [2, 3], 7: [3, 2], 8: [4, 1], 9: [4, 2], 10: [4, 3], 11: [5, 2], 12: [6, 2], 13: [7, 2]
+          },
+          links: [[1, 3], [2, 3], [3, 4], [2, 5], [4, 6], [5, 7], [6, 7], [7, 8], [7, 9], [7, 10], [8, 11], [9, 11], [10, 11], [11, 12], [12, 13]]
+        }
       };
-
-      const links = [
-        [1, 2], [2, 3],
-        [3, 4], [3, 5], [3, 6],
-        [4, 7], [5, 8], [6, 9],
-        [7, 10], [8, 10], [9, 10],
-        [10, 11], [11, 12], [12, 13]
-      ];
+      const mapConfig = floorMapConfigs[floor] || floorMapConfigs[1];
+      const roomPositions = mapConfig.roomPositions;
+      const links = mapConfig.links;
 
       ctx.save();
 
-      ctx.fillStyle = "#0b1124";
+      ctx.fillStyle = mapConfig.shell;
       ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-      ctx.fillStyle = "#17203a";
+      ctx.fillStyle = mapConfig.panel;
       ctx.fillRect(panelX + 3, panelY + 3, panelWidth - 6, panelHeight - 6);
-      ctx.fillStyle = "#22315e";
+      ctx.fillStyle = mapConfig.trim;
       for (let x = panelX + 7; x < panelX + panelWidth - 8; x += 8) {
         ctx.fillRect(x, panelY + 7, 2, 2);
         ctx.fillRect(x, panelY + panelHeight - 9, 2, 2);
@@ -435,10 +477,40 @@
         ctx.fillRect(panelX + panelWidth - 9, y, 2, 2);
       }
 
-      ctx.fillStyle = "#dbeafe";
+      if (floor === 2) {
+        ctx.fillStyle = "#7c5a3c";
+        for (let i = 0; i < 26; i += 1) {
+          const px = panelX + 16 + ((i * 23) % (panelWidth - 32));
+          const py = panelY + 26 + ((i * 17) % (panelHeight - 34));
+          ctx.fillRect(px, py, 2, 2);
+        }
+      } else if (floor === 3) {
+        ctx.fillStyle = "#0ea5e9";
+        for (let i = 0; i < 5; i += 1) {
+          const y = panelY + 28 + i * 16;
+          ctx.fillRect(panelX + 14, y, panelWidth - 28, 1);
+        }
+      } else if (floor === 4) {
+        ctx.fillStyle = "#facc15";
+        for (let i = 0; i < 4; i += 1) {
+          const x = panelX + 42 + i * 70;
+          ctx.fillRect(x, panelY + 26, 2, 12);
+          ctx.fillRect(x - 3, panelY + 38, 6, 2);
+        }
+      } else if (floor === 5) {
+        ctx.fillStyle = "#34d399";
+        for (let i = 0; i < 14; i += 1) {
+          const px = panelX + 22 + ((i * 19) % (panelWidth - 44));
+          const py = panelY + 28 + ((i * 11) % (panelHeight - 38));
+          ctx.fillRect(px, py, 3, 1);
+          ctx.fillRect(px + 1, py - 1, 1, 3);
+        }
+      }
+
+      ctx.fillStyle = mapConfig.title;
       ctx.font = "bold 12px monospace";
       ctx.textAlign = "left";
-      ctx.fillText("F1 MAP", panelX + 10, panelY + 18);
+      ctx.fillText(mapConfig.label, panelX + 10, panelY + 18);
 
       for (const [fromRoom, toRoom] of links) {
         const from = roomPositions[fromRoom];
@@ -449,7 +521,7 @@
         const x2 = mapOriginX + to[0] * spacingX + Math.floor(gridSize / 2);
         const y2 = mapOriginY + to[1] * spacingY + Math.floor(gridSize / 2);
 
-        ctx.fillStyle = "#475569";
+        ctx.fillStyle = mapConfig.link;
         if (y1 === y2) {
           const left = Math.min(x1, x2);
           ctx.fillRect(left, y1 - 2, Math.abs(x2 - x1), 4);

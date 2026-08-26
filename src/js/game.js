@@ -1,9 +1,9 @@
 (function () {
   "use strict";
 
-  const GAME_VERSION = "1.0.24";
+  const GAME_VERSION = "1.0.25";
   const MAX_FLOOR = 5;
-  const ROOMS_PER_FLOOR = 13;
+  const DEFAULT_ROOMS_PER_FLOOR = 13;
   const FIXED_MAX_DT = 1 / 20;
 
   function safeNumber(value, fallback) {
@@ -123,6 +123,8 @@
       const key = this.getFloorKey(floor);
       if (!this.floorProgress[key]) {
         this.floorProgress[key] = {
+          roomsPerFloor: this.getFloorRoomCount(floor),
+          roomTypes: {},
           clearedRooms: {},
           visitedRooms: {}
         };
@@ -130,9 +132,34 @@
       return this.floorProgress[key];
     }
 
+    getFloorRoomCount(floor = this.floor) {
+      if (!window.Room || typeof window.Room.roomsPerFloor !== "function") {
+        return DEFAULT_ROOMS_PER_FLOOR;
+      }
+      return clamp(safeNumber(window.Room.roomsPerFloor(floor), DEFAULT_ROOMS_PER_FLOOR), 1, 99);
+    }
+
+    getCurrentFloorRoomCount() {
+      const progress = this.ensureFloorProgress(this.floor);
+      return clamp(safeNumber(progress.roomsPerFloor, this.getFloorRoomCount(this.floor)), 1, 99);
+    }
+
+    syncFloorProgressFromRoom(room) {
+      if (!room) return;
+      const progress = this.ensureFloorProgress(this.floor);
+      const roomTypes = Array.isArray(room.floorData?.rooms) ? room.floorData.rooms : [];
+      progress.roomsPerFloor = clamp(safeNumber(room.floorData?.roomsPerFloor, progress.roomsPerFloor), 1, 99);
+      progress.roomTypes = progress.roomTypes || {};
+      for (let index = 0; index < roomTypes.length; index += 1) {
+        progress.roomTypes[index + 1] = String(roomTypes[index] || "normal").toLowerCase();
+      }
+      progress.roomTypes[this.roomNumber] = room.type || progress.roomTypes[this.roomNumber] || "normal";
+    }
+
     loadRoom(floor, roomNumber, entrySide = "bottom") {
       this.floor = clamp(safeNumber(floor, 1), 1, MAX_FLOOR);
-      this.roomNumber = clamp(safeNumber(roomNumber, 1), 1, ROOMS_PER_FLOOR);
+      const floorRooms = this.getFloorRoomCount(this.floor);
+      this.roomNumber = clamp(safeNumber(roomNumber, 1), 1, floorRooms);
       this.room = new window.Room(this.floor, this.roomNumber, {
         width: this.width,
         height: this.height,
@@ -140,6 +167,7 @@
       });
 
       const progress = this.ensureFloorProgress(this.floor);
+      this.syncFloorProgressFromRoom(this.room);
       progress.visitedRooms[this.roomNumber] = true;
 
       this.message = `Floor ${this.floor} - Room ${this.roomNumber}`;
@@ -238,12 +266,13 @@
     }
 
     advanceRoomOrFloor() {
-      if (this.floor === MAX_FLOOR && this.roomNumber === ROOMS_PER_FLOOR) {
+      const roomsThisFloor = this.getCurrentFloorRoomCount();
+      if (this.floor === MAX_FLOOR && this.roomNumber === roomsThisFloor) {
         this.state = "victory";
         return;
       }
 
-      if (this.roomNumber >= ROOMS_PER_FLOOR) {
+      if (this.roomNumber >= roomsThisFloor) {
         this.floor += 1;
         this.roomNumber = 1;
       } else {
@@ -293,6 +322,7 @@
       const projectileCount = player.projectiles ? player.projectiles.length : 0;
       const roomType = this.room ? this.room.type : "normal";
       const exitText = this.room && this.room.exitOpen ? "OPEN" : "LOCKED";
+      const roomsThisFloor = this.getCurrentFloorRoomCount();
 
       ctx.save();
       ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
@@ -307,7 +337,7 @@
       ctx.font = "14px monospace";
       ctx.fillText(`HP: ${Math.ceil(player.health ?? 0)} / ${Math.ceil(player.maxHealth ?? 100)}`, 28, 60);
       ctx.fillText(`Gold: ${Math.floor(player.gold ?? 0)}    XP: ${Math.floor(player.xp ?? 0)}`, 28, 80);
-      ctx.fillText(`Floor: ${this.floor}    Room: ${this.roomNumber}/${ROOMS_PER_FLOOR}`, 28, 100);
+      ctx.fillText(`Floor: ${this.floor}    Room: ${this.roomNumber}/${roomsThisFloor}`, 28, 100);
       ctx.fillText(`Type: ${roomType.toUpperCase()}    Exit: ${exitText}`, 28, 120);
       ctx.fillText(`Enemies: ${enemyCount}    Projectiles: ${projectileCount}`, 28, 140);
 
@@ -329,10 +359,32 @@
 
       const ctx = this.ctx;
       const progress = this.ensureFloorProgress(this.floor);
+      const roomsOnFloor = clamp(safeNumber(progress.roomsPerFloor, this.getCurrentFloorRoomCount()), 1, 99);
       const startX = this.width - 342;
       const startY = 18;
-      const cell = 22;
+      const topRowCount = Math.ceil(roomsOnFloor / 2);
+      const bottomRowCount = roomsOnFloor - topRowCount;
+      const longestRow = Math.max(topRowCount, bottomRowCount, 1);
+      const maxWidth = 292;
       const gap = 6;
+      const cell = clamp(Math.floor((maxWidth - (longestRow - 1) * gap) / longestRow), 14, 22);
+      const roomTypeSymbols = {
+        boss: "B",
+        shop: "$",
+        shop_locked: "L",
+        mystery: "?",
+        marked: "M",
+        secret: "S"
+      };
+      const roomTypeColors = {
+        normal: "#334155",
+        secret: "#7c3aed",
+        shop: "#92400e",
+        shop_locked: "#7f1d1d",
+        marked: "#0f766e",
+        mystery: "#6d28d9",
+        boss: "#7f1d1d"
+      };
 
       ctx.save();
       ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
@@ -345,16 +397,18 @@
       ctx.font = "bold 13px monospace";
       ctx.fillText("FLOOR MAP", startX, startY + 2);
 
-      for (let i = 1; i <= ROOMS_PER_FLOOR; i += 1) {
-        const row = i <= 7 ? 0 : 1;
-        const col = row === 0 ? i - 1 : i - 8;
+      for (let i = 1; i <= roomsOnFloor; i += 1) {
+        const row = i <= topRowCount ? 0 : 1;
+        const col = row === 0 ? i - 1 : i - topRowCount - 1;
         const x = startX + col * (cell + gap);
         const y = startY + 16 + row * (cell + gap);
 
         const isCurrent = i === this.roomNumber;
         const isCleared = Boolean(progress.clearedRooms[i]);
         const isVisited = Boolean(progress.visitedRooms[i]);
-        const isBoss = i === ROOMS_PER_FLOOR;
+        const roomType = String(progress.roomTypes?.[i] || (i === roomsOnFloor ? "boss" : "normal")).toLowerCase();
+        const isBoss = roomType === "boss";
+        const baseColor = roomTypeColors[roomType] || roomTypeColors.normal;
 
         if (isCurrent) {
           ctx.fillStyle = "#facc15";
@@ -362,10 +416,8 @@
           ctx.fillStyle = "#22c55e";
         } else if (isVisited) {
           ctx.fillStyle = "#38bdf8";
-        } else if (isBoss) {
-          ctx.fillStyle = "#7f1d1d";
         } else {
-          ctx.fillStyle = "#334155";
+          ctx.fillStyle = baseColor;
         }
 
         ctx.fillRect(x, y, cell, cell);
@@ -376,7 +428,8 @@
         ctx.fillStyle = isBoss ? "#ffffff" : "#0f172a";
         ctx.font = "bold 10px monospace";
         ctx.textAlign = "center";
-        ctx.fillText(isBoss ? "B" : String(i), x + cell / 2, y + 15);
+        const symbol = roomTypeSymbols[roomType] || String(i);
+        ctx.fillText(symbol, x + cell / 2, y + Math.min(cell - 7, 15));
       }
 
       ctx.restore();

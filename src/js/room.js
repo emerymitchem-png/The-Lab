@@ -1,11 +1,11 @@
 (function () {
   "use strict";
 
-  const ROOM_VERSION = "1.0.24";
+  const ROOM_VERSION = "1.0.26";
   const DEFAULT_ROOM_WIDTH = 960;
   const DEFAULT_ROOM_HEIGHT = 640;
   const DEFAULT_WALL_THICKNESS = 36;
-  const ROOMS_PER_FLOOR = 13;
+  const DEFAULT_ROOMS_PER_FLOOR = 13;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -25,9 +25,105 @@
     );
   }
 
+  function pointInRect(x, y, rect) {
+    return (
+      x >= rect.x &&
+      x <= rect.x + rect.width &&
+      y >= rect.y &&
+      y <= rect.y + rect.height
+    );
+  }
+
+  function getEntityRect(entity) {
+    if (!entity) return { x: 0, y: 0, width: 0, height: 0 };
+    if (typeof entity.getRect === "function") {
+      return entity.getRect();
+    }
+    const radius = safeNumber(entity.radius, 12);
+    return {
+      x: safeNumber(entity.x, 0) - radius,
+      y: safeNumber(entity.y, 0) - radius,
+      width: radius * 2,
+      height: radius * 2
+    };
+  }
+
+  function rectCenter(rect) {
+    return {
+      x: rect.x + rect.width / 2,
+      y: rect.y + rect.height / 2
+    };
+  }
+
   function getDifficultyScale(floor) {
     const safeFloor = clamp(safeNumber(floor, 1), 1, 5);
     return 1 + ((safeFloor - 1) * 0.125);
+  }
+
+  function safeInt(value, fallback) {
+    return Math.round(safeNumber(value, fallback));
+  }
+
+  function normalizeRoomTypeName(value) {
+    const key = String(value || "normal").toLowerCase();
+    if (key === "normal_room" || key === "normal_rooms") return "normal";
+    if (key === "secret_room" || key === "secret_rooms") return "secret";
+    if (key === "shop_room") return "shop";
+    if (key === "boss_room") return "boss";
+    if (key === "marked_unlocked_door" || key === "marked_door" || key === "marked") return "marked";
+    if (key === "shop_locked_door" || key === "locked_shop") return "shop_locked";
+    if (key === "mystery_door" || key === "mystery") return "mystery";
+    if (key === "shop_or_mystery_door") return "mystery";
+    return key;
+  }
+
+  function deterministicPick(seed, probability) {
+    const unit = Math.abs(Math.sin(seed * 91.337 + 0.618)) % 1;
+    return unit < probability;
+  }
+
+  function buildGeneratedRoomPlan(floor, nested, roomsPerFloor) {
+    const guaranteed = nested.guaranteed_rooms || nested.guaranteedRooms || {};
+    const procedural = nested.procedural_room || nested.proceduralRoom || {};
+    const proceduralProbability = procedural.probability || {};
+
+    const plan = new Array(Math.max(1, roomsPerFloor)).fill("normal");
+    const lastIndex = plan.length - 1;
+    plan[lastIndex] = "boss";
+
+    const specialTypes = [];
+    const pushMany = (type, count) => {
+      for (let i = 0; i < count; i += 1) {
+        specialTypes.push(normalizeRoomTypeName(type));
+      }
+    };
+
+    pushMany("secret", Math.max(0, safeInt(guaranteed.secret_rooms, 0)));
+    pushMany("shop", Math.max(0, safeInt(guaranteed.shop_room, 0)));
+    pushMany("marked", Math.max(0, safeInt(guaranteed.marked_unlocked_door, 0)));
+
+    const proceduralCount = Math.max(0, safeInt(procedural.count, 0));
+    const mysteryChance = clamp(safeNumber(proceduralProbability.mystery_door, 0.25), 0, 1);
+    for (let i = 0; i < proceduralCount; i += 1) {
+      const isMystery = deterministicPick(floor * 1000 + i * 13 + roomsPerFloor, mysteryChance);
+      specialTypes.push(isMystery ? "mystery" : "shop_locked");
+    }
+
+    const available = [];
+    for (let i = 0; i < lastIndex; i += 1) {
+      available.push(i);
+    }
+
+    for (let i = 0; i < specialTypes.length && available.length > 0; i += 1) {
+      const pickIndex = Math.abs((floor * 37 + i * 17 + roomsPerFloor * 11) % available.length);
+      const slot = available.splice(pickIndex, 1)[0];
+      if (slot > 0) {
+        plan[slot] = specialTypes[i];
+      }
+    }
+
+    plan[0] = "normal";
+    return plan;
   }
 
   function getLoader() {
@@ -60,7 +156,15 @@
 
     return {
       floor,
-      roomsPerFloor: safeNumber(nested.roomsPerFloor ?? nested.rooms_per_floor ?? nested.roomCount ?? nested.room_count, ROOMS_PER_FLOOR),
+      roomsPerFloor: safeNumber(
+        nested.total_rooms ??
+        nested.totalRooms ??
+        nested.roomsPerFloor ??
+        nested.rooms_per_floor ??
+        nested.roomCount ??
+        nested.room_count,
+        DEFAULT_ROOMS_PER_FLOOR
+      ),
       width: safeNumber(nested.width ?? nested.roomWidth ?? nested.room_width, DEFAULT_ROOM_WIDTH),
       height: safeNumber(nested.height ?? nested.roomHeight ?? nested.room_height, DEFAULT_ROOM_HEIGHT),
       wallThickness: safeNumber(nested.wallThickness ?? nested.wall_thickness, DEFAULT_WALL_THICKNESS),
@@ -68,8 +172,28 @@
       enemyCountMax: safeNumber(nested.enemyCountMax ?? nested.enemy_count_max ?? nested.maxEnemies ?? nested.max_enemies, 3),
       spawnRate: safeNumber(nested.spawnRate ?? nested.spawn_rate ?? nested.enemySpawnRate ?? nested.enemy_spawn_rate, 1),
       difficultyScale: safeNumber(nested.difficultyScale ?? nested.difficulty_scale, getDifficultyScale(floor)),
-      rooms: Array.isArray(nested.rooms) ? nested.rooms : []
+      barriers: nested.barriers && typeof nested.barriers === "object" ? nested.barriers : {},
+      rooms: []
     };
+
+    const explicitRooms = Array.isArray(nested.rooms) ? nested.rooms : [];
+    const normalizedExplicitRooms = explicitRooms
+      .map((entry) => normalizeRoomTypeName(typeof entry === "string" ? entry : entry && entry.type))
+      .filter(Boolean);
+
+    const generatedRooms = buildGeneratedRoomPlan(floor, nested, normalized.roomsPerFloor);
+    const plannedRooms = normalizedExplicitRooms.length > 0 ? normalizedExplicitRooms : generatedRooms;
+
+    normalized.rooms = plannedRooms.slice(0, normalized.roomsPerFloor);
+    while (normalized.rooms.length < normalized.roomsPerFloor) {
+      normalized.rooms.push("normal");
+    }
+
+    if (normalized.rooms.length > 0) {
+      normalized.rooms[normalized.rooms.length - 1] = "boss";
+    }
+
+    return normalized;
   }
 
   function getRoomType(roomNumber, floorData) {
@@ -78,7 +202,7 @@
     const explicitType = typeof roomEntry === "string" ? roomEntry : roomEntry && roomEntry.type;
 
     if (explicitType) {
-      return String(explicitType).toLowerCase();
+      return normalizeRoomTypeName(explicitType);
     }
 
     if (roomNumber === floorData.roomsPerFloor) {
@@ -194,41 +318,48 @@
     constructor(floor = 1, roomNumber = 1, options = {}) {
       this.version = ROOM_VERSION;
       this.floor = clamp(safeNumber(floor, 1), 1, 5);
-      this.roomNumber = clamp(safeNumber(roomNumber, 1), 1, ROOMS_PER_FLOOR);
-      this.roomIndex = this.roomNumber - 1;
 
       const rawFloorData = options.floorData || callLoaderMethod("getFloorData", this.floor);
       this.floorData = normalizeFloorData(rawFloorData, this.floor);
       this.floorData.roomsPerFloor = clamp(this.floorData.roomsPerFloor, 1, 99);
+      this.roomNumber = clamp(safeNumber(roomNumber, 1), 1, this.floorData.roomsPerFloor);
+      this.roomIndex = this.roomNumber - 1;
 
       this.width = safeNumber(options.width, this.floorData.width);
       this.height = safeNumber(options.height, this.floorData.height);
       this.wallThickness = safeNumber(options.wallThickness, this.floorData.wallThickness);
       this.difficultyScale = safeNumber(options.difficultyScale, this.floorData.difficultyScale);
 
-      this.type = String(options.type || getRoomType(this.roomNumber, this.floorData)).toLowerCase();
-      this.cleared = this.type === "shop";
+      this.type = normalizeRoomTypeName(options.type || getRoomType(this.roomNumber, this.floorData));
+      const isSafeType = this.type === "shop" || this.type === "shop_locked" || this.type === "marked";
+      this.cleared = isSafeType;
       this.rewardGiven = false;
       this.started = false;
       this.clearTimer = this.cleared ? 99 : 0;
       this.clearDelay = 0.35;
-      this.exitOpen = this.type === "shop";
+      this.exitOpen = isSafeType;
       this.exitUsed = false;
       this.feedbackTexts = [];
 
       this.exitDoor = this.generateExitDoor();
       this.safeZones = this.generateSafeZones();
       this.walls = this.generateWalls();
+      this.environmentFeatures = this.generateEnvironmentalFeatures();
+      this.roomFeatures = this.generateRoomFeatures();
       this.enemies = [];
       this.spawnEnemies(options.enemyData);
+      this.roomFeaturePromptCooldown = 0;
 
-      if (this.type === "shop") {
-        this.addFeedback("SHOP - Exit is open", this.width / 2, this.height / 2 - 80, "#facc15");
+      if (isSafeType) {
+        const label = this.type === "marked" ? "MARKED ROOM" : "SHOP";
+        this.addFeedback(`${label} - Exit is open`, this.width / 2, this.height / 2 - 80, "#facc15");
       }
     }
 
-    static roomsPerFloor() {
-      return ROOMS_PER_FLOOR;
+    static roomsPerFloor(floor = 1) {
+      const safeFloor = clamp(safeNumber(floor, 1), 1, 5);
+      const floorData = normalizeFloorData(callLoaderMethod("getFloorData", safeFloor), safeFloor);
+      return clamp(safeNumber(floorData.roomsPerFloor, DEFAULT_ROOMS_PER_FLOOR), 1, 99);
     }
 
     static difficultyScaleForFloor(floor) {
@@ -324,12 +455,14 @@
 
       const layout = this.getLayoutName();
 
-      if (this.type === "shop") {
+      if (this.type === "shop" || this.type === "shop_locked") {
         walls.push(...this.makeShopObstacles());
       } else if (this.type === "boss") {
         walls.push(...this.makeBossObstacles());
       } else if (this.type === "secret") {
         walls.push(...this.makeSecretObstacles());
+      } else if (this.type === "marked") {
+        walls.push(...this.makeMarkedObstacles());
       } else if (layout === "cross") {
         walls.push(...this.makeCrossObstacles());
       } else if (layout === "lanes") {
@@ -415,6 +548,145 @@
       ];
     }
 
+    makeMarkedObstacles() {
+      const w = this.width;
+      const h = this.height;
+      return [
+        this.makeLabBench(w * 0.25, h * 0.35, 92, 44, "marker_totem"),
+        this.makeLabBench(w * 0.63, h * 0.35, 92, 44, "marker_totem"),
+        this.makeLabBench(w * 0.45, h * 0.58, 96, 62, "reward_altar")
+      ];
+    }
+
+    getFeatureRect(slot, total, width = 96, height = 76) {
+      const margin = this.wallThickness + 80;
+      const usableWidth = Math.max(1, this.width - margin * 2);
+      const usableHeight = Math.max(1, this.height - margin * 2);
+      const angle = ((Math.PI * 2) / Math.max(1, total)) * slot + (this.floor * 0.22);
+      const radiusX = usableWidth * 0.34;
+      const radiusY = usableHeight * 0.28;
+      const cx = clamp(this.width * 0.5 + Math.cos(angle) * radiusX, margin, this.width - margin);
+      const cy = clamp(this.height * 0.5 + Math.sin(angle) * radiusY, margin, this.height - margin);
+      return {
+        x: cx - width / 2,
+        y: cy - height / 2,
+        width,
+        height
+      };
+    }
+
+    createEnvironmentalFeature(type, slot, total) {
+      const featureType = normalizeRoomTypeName(type);
+      const rect = this.getFeatureRect(slot, total, 110, 84);
+      const map = {
+        fire: { color: "#dc2626", label: "FIRE", damagePerSecond: 5, speedMultiplier: 1, pulse: true },
+        sealed: { color: "#64748b", label: "SEALED", damagePerSecond: 0, speedMultiplier: 1, pulse: false },
+        gaps: { color: "#111827", label: "GAP", damagePerSecond: 7, speedMultiplier: 0.88, pulse: true },
+        rock: { color: "#6b7280", label: "ROCK", damagePerSecond: 0, speedMultiplier: 0.92, pulse: false },
+        ice: { color: "#38bdf8", label: "ICE", damagePerSecond: 0, speedMultiplier: 0.72, pulse: true },
+        water: { color: "#1d4ed8", label: "WATER", damagePerSecond: 1.5, speedMultiplier: 0.82, pulse: true },
+        wind: { color: "#93c5fd", label: "WIND", damagePerSecond: 0, speedMultiplier: 0.9, pushX: 22, pushY: 0, pulse: true },
+        storm: { color: "#a78bfa", label: "STORM", damagePerSecond: 4, speedMultiplier: 0.8, pulse: true },
+        cosmic: { color: "#7c3aed", label: "COSMIC", damagePerSecond: 6, speedMultiplier: 0.86, pulse: true },
+        primordial: { color: "#f97316", label: "PRIMORDIAL", damagePerSecond: 5, speedMultiplier: 0.9, pulse: true },
+        mixed: { color: "#14b8a6", label: "MIXED", damagePerSecond: 4.5, speedMultiplier: 0.82, pushX: 14, pushY: -8, pulse: true }
+      };
+      const defaults = map[featureType] || { color: "#475569", label: String(type || "FIELD").toUpperCase(), damagePerSecond: 0, speedMultiplier: 1, pulse: false };
+      return {
+        kind: "environment",
+        type: featureType,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        color: defaults.color,
+        label: defaults.label,
+        damagePerSecond: safeNumber(defaults.damagePerSecond, 0),
+        speedMultiplier: clamp(safeNumber(defaults.speedMultiplier, 1), 0.4, 1),
+        pushX: safeNumber(defaults.pushX, 0),
+        pushY: safeNumber(defaults.pushY, 0),
+        pulse: Boolean(defaults.pulse),
+        tickTimer: 0.25
+      };
+    }
+
+    generateEnvironmentalFeatures() {
+      const barrierCounts = this.floorData.barriers && typeof this.floorData.barriers === "object"
+        ? this.floorData.barriers
+        : {};
+
+      const weightedTypes = [];
+      for (const [barrierType, countValue] of Object.entries(barrierCounts)) {
+        if (barrierType === "total") continue;
+        const count = clamp(safeInt(countValue, 0), 0, 4);
+        for (let i = 0; i < count; i += 1) {
+          weightedTypes.push(normalizeRoomTypeName(barrierType));
+        }
+      }
+
+      if (weightedTypes.length === 0) {
+        return [];
+      }
+
+      const preferredCount = {
+        normal: 1,
+        secret: 2,
+        mystery: 3,
+        marked: 1,
+        shop: 1,
+        shop_locked: 1,
+        boss: 2
+      };
+      const target = clamp(preferredCount[this.type] || 1, 1, 3);
+      const features = [];
+
+      for (let i = 0; i < target; i += 1) {
+        const index = Math.abs((this.floor * 41 + this.roomNumber * 13 + i * 29) % weightedTypes.length);
+        const barrierType = weightedTypes[index];
+        const feature = this.createEnvironmentalFeature(barrierType, i, target);
+        features.push(feature);
+      }
+
+      return features;
+    }
+
+    createRoomFeature(type, options = {}) {
+      const rect = options.rect || this.getFeatureRect(options.slot || 0, options.total || 1, options.width || 96, options.height || 68);
+      return {
+        kind: "room_feature",
+        type,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        color: options.color || "#facc15",
+        label: options.label || "FEATURE",
+        used: false,
+        oneTime: options.oneTime !== false
+      };
+    }
+
+    generateRoomFeatures() {
+      const features = [];
+      const add = (type, options) => features.push(this.createRoomFeature(type, options));
+
+      if (this.type === "secret") {
+        add("secret_cache", { label: "SECRET CACHE", color: "#a855f7", slot: 0, total: 1, width: 116, height: 72 });
+      } else if (this.type === "marked") {
+        add("marked_reward", { label: "MARKED ALTAR", color: "#0d9488", slot: 0, total: 1, width: 116, height: 72 });
+      } else if (this.type === "shop" || this.type === "shop_locked") {
+        add("shop_station", { label: "SUPPLY STATION", color: "#f59e0b", slot: 0, total: 1, width: 132, height: 72 });
+      } else if (this.type === "mystery") {
+        add("mystery_cache", { label: "UNSTABLE CACHE", color: "#7c3aed", slot: 0, total: 1, width: 128, height: 72 });
+      } else if (this.type === "boss") {
+        add("boss_console", { label: "CORE CONSOLE", color: "#ef4444", slot: 0, total: 1, width: 120, height: 72 });
+      } else {
+        add("normal_terminal", { label: "RESEARCH NODE", color: "#3b82f6", slot: 0, total: 1, width: 118, height: 68 });
+      }
+
+      return features;
+    }
+
     makeBossObstacles() {
       const w = this.width;
       const h = this.height;
@@ -438,7 +710,7 @@
     }
 
     getEnemyCount() {
-      if (this.type === "shop") return 0;
+      if (this.type === "shop" || this.type === "shop_locked" || this.type === "marked") return 0;
       if (this.type === "boss") return 1;
 
       const min = Math.max(1, Math.round(this.floorData.enemyCountMin));
@@ -446,7 +718,7 @@
       const floorBonus = Math.floor((this.floor - 1) / 2);
       const roomBonus = this.roomNumber > 8 ? 1 : 0;
       const base = min + ((this.floor * 7 + this.roomNumber * 5) % (max - min + 1));
-      const typeBonus = this.type === "secret" ? 1 : 0;
+      const typeBonus = this.type === "secret" ? 1 : this.type === "mystery" ? 2 : 0;
       return clamp(Math.round((base + floorBonus + roomBonus + typeBonus) * this.floorData.spawnRate), 1, 8);
     }
 
@@ -513,6 +785,8 @@
       const delta = safeNumber(dt, 0);
       this.started = true;
       this.updateFeedback(delta);
+      this.updateEnvironmentalFeatures(delta, player);
+      this.updateRoomFeatures(delta, player);
 
       for (const enemy of this.enemies) {
         if (enemy && typeof enemy.update === "function") {
@@ -542,6 +816,110 @@
         text.life -= dt;
       }
       this.feedbackTexts = this.feedbackTexts.filter((text) => text.life > 0);
+    }
+
+    updateRoomFeatures(dt, player) {
+      if (!player) return;
+      const playerRect = getEntityRect(player);
+      this.roomFeaturePromptCooldown = Math.max(0, this.roomFeaturePromptCooldown - safeNumber(dt, 0));
+
+      for (const feature of this.roomFeatures || []) {
+        if (!feature || (feature.oneTime && feature.used)) continue;
+        if (!rectsOverlap(playerRect, feature)) continue;
+        this.activateRoomFeature(feature, player);
+      }
+    }
+
+    activateRoomFeature(feature, player) {
+      if (!feature || (feature.oneTime && feature.used)) return;
+      const center = rectCenter(feature);
+      let message = "";
+      let color = feature.color || "#f8fafc";
+
+      if (feature.type === "secret_cache") {
+        const gold = 18 + this.floor * 5;
+        const xp = 20 + this.floor * 6;
+        if (typeof player.addGold === "function") player.addGold(gold);
+        if (typeof player.addXP === "function") player.addXP(xp);
+        message = `Secret cache: +${gold}g +${xp}xp`;
+      } else if (feature.type === "marked_reward") {
+        const heal = 8 + this.floor * 2;
+        const recovered = typeof player.heal === "function" ? player.heal(heal) : 0;
+        const gold = 10 + this.floor * 4;
+        if (typeof player.addGold === "function") player.addGold(gold);
+        message = `Marked reward: +${gold}g +${Math.round(recovered)}hp`;
+      } else if (feature.type === "shop_station") {
+        const heal = 6 + this.floor * 2;
+        const recovered = typeof player.heal === "function" ? player.heal(heal) : 0;
+        message = recovered > 0 ? `Supply station: +${Math.round(recovered)}hp` : "Supply station: fully stocked";
+      } else if (feature.type === "mystery_cache") {
+        const gold = 24 + this.floor * 8;
+        const xp = 32 + this.floor * 9;
+        if (typeof player.takeDamage === "function") {
+          player.takeDamage(6 + this.floor, { type: "mystery_cache" });
+        }
+        if (typeof player.addGold === "function") player.addGold(gold);
+        if (typeof player.addXP === "function") player.addXP(xp);
+        message = `Mystery cache: +${gold}g +${xp}xp (volatile)`;
+        color = "#c084fc";
+      } else if (feature.type === "boss_console") {
+        const heal = 5 + this.floor;
+        const recovered = typeof player.heal === "function" ? player.heal(heal) : 0;
+        message = recovered > 0 ? `Core console: stabilized +${Math.round(recovered)}hp` : "Core console: stabilized";
+        color = "#fb7185";
+      } else if (feature.type === "normal_terminal") {
+        const xp = 10 + this.floor * 3;
+        if (typeof player.addXP === "function") player.addXP(xp);
+        message = `Research node: +${xp}xp`;
+      }
+
+      feature.used = feature.oneTime !== false;
+      if (message) {
+        this.addFeedback(message, center.x, center.y - 22, color);
+      }
+    }
+
+    updateEnvironmentalFeatures(dt, player) {
+      if (!player) return;
+
+      const delta = safeNumber(dt, 0);
+      const playerRect = getEntityRect(player);
+      const baseSpeed = safeNumber(player.baseSpeed, player.speed);
+      let speedMultiplier = 1;
+
+      for (const feature of this.environmentFeatures || []) {
+        if (!feature) continue;
+        const overlap = rectsOverlap(playerRect, feature);
+        if (!overlap) continue;
+
+        speedMultiplier = Math.min(speedMultiplier, clamp(safeNumber(feature.speedMultiplier, 1), 0.4, 1));
+
+        const pushX = safeNumber(feature.pushX, 0);
+        const pushY = safeNumber(feature.pushY, 0);
+        if (pushX !== 0 || pushY !== 0) {
+          player.x += pushX * delta;
+          player.y += pushY * delta;
+        }
+
+        const dps = Math.max(0, safeNumber(feature.damagePerSecond, 0));
+        feature.tickTimer = safeNumber(feature.tickTimer, 0.25) - delta;
+        if (dps > 0 && feature.tickTimer <= 0) {
+          const damage = Math.max(1, Math.round(dps * 0.4));
+          if (typeof player.takeDamage === "function") {
+            const dealt = player.takeDamage(damage, { type: `environment_${feature.type}` });
+            if (dealt > 0) {
+              const center = rectCenter(feature);
+              this.addFeedback(`-${dealt} ${feature.label}`, center.x, center.y - 18, "#fca5a5");
+            }
+          }
+          feature.tickTimer = 0.4;
+        } else if (feature.tickTimer <= 0) {
+          feature.tickTimer = 0.4;
+        }
+      }
+
+      player.speed = baseSpeed * speedMultiplier;
+      player.moveSpeed = player.speed;
     }
 
     getAliveEnemyCount() {
@@ -598,8 +976,10 @@
       if (!ctx) return;
 
       this.drawFloor(ctx, camera);
+      this.drawEnvironmentalFeatures(ctx, camera);
       this.drawExit(ctx, camera);
       this.drawWalls(ctx, camera);
+      this.drawRoomFeatures(ctx, camera);
 
       for (const enemy of this.enemies) {
         if (enemy && typeof enemy.draw === "function") {
@@ -618,6 +998,9 @@
         normal: "#152033",
         secret: "#1e1b4b",
         shop: "#1f2933",
+        shop_locked: "#3f1d1d",
+        marked: "#052e2b",
+        mystery: "#3b0764",
         boss: "#2a1620"
       };
 
@@ -673,6 +1056,34 @@
       ctx.restore();
     }
 
+    drawEnvironmentalFeatures(ctx, camera) {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "bold 11px monospace";
+
+      for (const feature of this.environmentFeatures || []) {
+        if (!feature) continue;
+        const x = feature.x - safeNumber(camera.x, 0);
+        const y = feature.y - safeNumber(camera.y, 0);
+        const alphaPulse = feature.pulse ? (0.16 + Math.sin(performance.now() / 170) * 0.08) : 0.18;
+
+        ctx.fillStyle = feature.color;
+        ctx.globalAlpha = clamp(alphaPulse, 0.08, 0.3);
+        ctx.fillRect(x, y, feature.width, feature.height);
+
+        ctx.globalAlpha = 0.75;
+        ctx.strokeStyle = feature.color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 1, y + 1, feature.width - 2, feature.height - 2);
+
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = "#e2e8f0";
+        ctx.fillText(feature.label, x + feature.width / 2, y + feature.height / 2 + 4);
+      }
+
+      ctx.restore();
+    }
+
     drawWalls(ctx, camera) {
       ctx.save();
 
@@ -710,6 +1121,32 @@
       ctx.restore();
     }
 
+    drawRoomFeatures(ctx, camera) {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "bold 12px monospace";
+
+      for (const feature of this.roomFeatures || []) {
+        if (!feature || (feature.oneTime && feature.used)) continue;
+        const x = feature.x - safeNumber(camera.x, 0);
+        const y = feature.y - safeNumber(camera.y, 0);
+
+        ctx.fillStyle = feature.color;
+        ctx.globalAlpha = 0.22;
+        ctx.fillRect(x, y, feature.width, feature.height);
+
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = feature.color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 1, y + 1, feature.width - 2, feature.height - 2);
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.fillText(feature.label, x + feature.width / 2, y + feature.height / 2 + 4);
+      }
+
+      ctx.restore();
+    }
+
     drawFeedback(ctx, camera) {
       ctx.save();
       ctx.textAlign = "center";
@@ -726,6 +1163,6 @@
   }
 
   Room.VERSION = ROOM_VERSION;
-  Room.ROOMS_PER_FLOOR = ROOMS_PER_FLOOR;
+  Room.ROOMS_PER_FLOOR = DEFAULT_ROOMS_PER_FLOOR;
   window.Room = Room;
 })();

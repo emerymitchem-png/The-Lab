@@ -11,13 +11,16 @@ class Game {
         this.currentFloor = 1;
         this.currentRoom = 1;
         this.currentRoomObject = null;
-        this.totalRoomsPerFloor = 1; // Updated from floor data at room generation
-        
+        this.floorMap = null; // FloorMap for current floor
+
         this.gameState = 'menu'; // menu, playing, paused, gameover
         this.isPaused = false;
         this.startTime = 0;
         this.elapsedTime = 0;
-        
+
+        // Prevent rapidly triggering the same room transition
+        this.transitioning = false;
+
         // Stats tracking
         this.stats = {
             floorsReached: 1,
@@ -28,7 +31,6 @@ class Game {
         };
 
         this.setupEventListeners();
-        this.gameLoop = this.update.bind(this);
     }
 
     setupEventListeners() {
@@ -39,6 +41,10 @@ class Game {
         window.addEventListener('resize', () => {
             this.canvas.width = window.innerWidth - 10;
             this.canvas.height = window.innerHeight - 10;
+            // Regenerate current room with new canvas size
+            if (this.currentRoomObject && this.floorMap) {
+                this.generateRoom();
+            }
         });
     }
 
@@ -46,44 +52,55 @@ class Game {
         console.log("Game starting...");
         this.gameState = 'playing';
         this.isPaused = false;
+        this.transitioning = false;
         this.startTime = Date.now();
         this.initializeGame();
         this.animate(0);
     }
 
     initializeGame() {
-        // Initialize player
+        this.currentFloor = 1;
+        this.currentRoom = 1;
+
+        // Build the floor map (planned room sequence)
+        this.floorMap = new FloorMap(this.currentFloor);
+
+        // Initialize player at center of canvas
         this.player = new Player(
             this.canvas.width / 2,
             this.canvas.height / 2,
             this.canvas
         );
 
-        // Generate first room
         this.generateRoom();
     }
 
     generateRoom() {
-        const floorData = gameLoader.getFloorData(this.currentFloor);
-        const configuredRoomCount = Number(floorData?.total_rooms);
-        if (Number.isFinite(configuredRoomCount) && configuredRoomCount > 0) {
-            this.totalRoomsPerFloor = configuredRoomCount;
-        }
-
         this.currentRoomObject = new Room(
             this.currentFloor,
             this.currentRoom,
-            this.totalRoomsPerFloor,
+            this.floorMap,
             this.canvas
         );
 
-        console.log(`Generated Floor ${this.currentFloor}, Room ${this.currentRoom}/${this.totalRoomsPerFloor}`);
+        // Place player at left-center of the room (entry side), not center
+        const b = this.currentRoomObject.bounds;
+        this.player.x = b.x + 60;
+        this.player.y = b.y + b.height / 2 - this.player.height / 2;
+
+        this.transitioning = false;
+
+        console.log(`Floor ${this.currentFloor} | Room ${this.currentRoom}/${this.floorMap.totalRooms} | Type: ${this.floorMap.typeAt(this.currentRoom)}`);
     }
 
     nextRoom() {
-        if (this.currentRoom < this.totalRoomsPerFloor) {
+        if (this.transitioning) return;
+        this.transitioning = true;
+
+        this.stats.roomsCleared++;
+
+        if (this.currentRoom < this.floorMap.totalRooms) {
             this.currentRoom++;
-            this.stats.roomsCleared++;
             this.generateRoom();
         } else {
             this.nextFloor();
@@ -95,9 +112,9 @@ class Game {
             this.currentFloor++;
             this.currentRoom = 1;
             this.stats.floorsReached = this.currentFloor;
+            this.floorMap = new FloorMap(this.currentFloor);
             this.generateRoom();
         } else {
-            // Game victory!
             this.victory();
         }
     }
@@ -119,14 +136,9 @@ class Game {
                 return;
             }
 
-            // Check if room is cleared
-            if (this.currentRoomObject.isCleared()) {
-                // Wait a moment before advancing
-                setTimeout(() => {
-                    if (this.gameState === 'playing') {
-                        this.nextRoom();
-                    }
-                }, 500);
+            // Transition: player walks into exit door opening
+            if (!this.transitioning && this.currentRoomObject.playerAtExit(this.player)) {
+                this.nextRoom();
             }
         }
 
@@ -135,7 +147,7 @@ class Game {
             this.player,
             this.currentFloor,
             this.currentRoom,
-            this.totalRoomsPerFloor
+            this.floorMap ? this.floorMap.totalRooms : 1
         );
 
         // Update elapsed time
@@ -147,12 +159,12 @@ class Game {
         this.ctx.fillStyle = '#0f1425';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw room
+        // Draw room (handles floor, walls, enemies)
         if (this.currentRoomObject) {
             this.currentRoomObject.draw(this.ctx);
         }
 
-        // Draw player
+        // Draw player on top
         this.player.draw(this.ctx);
 
         // Draw debug info
@@ -160,11 +172,12 @@ class Game {
     }
 
     drawDebugInfo() {
-        this.ctx.fillStyle = '#00ff00';
-        this.ctx.font = '10px Courier';
-        this.ctx.fillText(`FPS: ${Math.round(1000/16)}`, 10, this.canvas.height - 10);
-        this.ctx.fillText(`Player Pos: ${Math.round(this.player.x)}, ${Math.round(this.player.y)}`, 10, this.canvas.height - 20);
-        this.ctx.fillText(`Enemies: ${this.currentRoomObject.enemies.length}`, 10, this.canvas.height - 30);
+        const room = this.currentRoomObject;
+        this.ctx.fillStyle = '#00ff0088';
+        this.ctx.font = '10px Courier New';
+        this.ctx.fillText(`Floor ${this.currentFloor} | Room ${this.currentRoom}/${this.floorMap?.totalRooms ?? '?'} | Type: ${room?.roomType ?? '?'}`, 10, this.canvas.height - 10);
+        this.ctx.fillText(`Player: ${Math.round(this.player.x)}, ${Math.round(this.player.y)}`, 10, this.canvas.height - 22);
+        this.ctx.fillText(`Enemies: ${room?.enemies.length ?? 0} | Cleared: ${room?.cleared ?? false}`, 10, this.canvas.height - 34);
     }
 
     togglePause() {
@@ -191,7 +204,7 @@ class Game {
 
     animate(lastTime) {
         const now = performance.now();
-        const deltaTime = Math.min((now - lastTime) / 1000, 0.016); // Cap at 60fps
+        const deltaTime = Math.min((now - lastTime) / 1000, 0.05); // cap at ~20fps minimum
 
         this.update(deltaTime);
         this.draw();
@@ -207,26 +220,23 @@ let game = null;
 
 window.addEventListener('DOMContentLoaded', async () => {
     console.log("DOM loaded, loading game data...");
-    
-    // Load all game data first
+
     const dataLoaded = await gameLoader.loadAllData();
-    
+
     if (!dataLoaded) {
         console.error("Failed to load game data");
         alert("Failed to load game data. Check console for errors.");
         return;
     }
 
-    // Initialize game
     const canvas = document.getElementById('gameCanvas');
     game = new Game(canvas);
 
-    // Handle start button
-    window.gameReady = false;
+    window.gameReady   = false;
     window.gameRunning = false;
-    window.gamePaused = false;
+    window.gamePaused  = false;
 
-    // Poll for start signal from UI
+    // Poll for start signal from ui.js button handler
     const checkForStart = setInterval(() => {
         if (window.gameReady) {
             window.gameReady = false;
@@ -239,7 +249,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.log("Game initialized and ready!");
 });
 
-// Handle pause signal from UI
+// Pause via Escape key (ui.js also handles the menu button)
 window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && window.gameRunning && game) {
         if (window.gamePaused) {

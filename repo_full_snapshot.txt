@@ -1,0 +1,4279 @@
+===== FILE: README.md =====
+# The-Lab
+
+A roguelite dungeon crawler where you combine science specializations to fight your way through 5 biome floors. Each specialization changes how you attack and what effects you deal. Discover new specializations as you progress, combine them for powerful synergies, and unlock permanent tools.
+
+## Game Structure
+
+- **5 Floors** (Lab → Geosphere → Hydrosphere → Atmosphere → Biosphere)
+- **Scaled floor sizes (11→13→14→14→13 rooms)** (normal rooms, secret rooms, marked doors, shop, boss)
+- **34 Science Specializations** (unlock as you progress through floors)
+- **Combination System** (mix specializations for new projectiles and debuffs)
+- **Consumable Tools** (Match, Rope, Blowtorch, Breaker Bar)
+- **Permanent Tools** (Grappling Hook, Fire Extinguisher, Magnifying Glass, Drill, Plasma Cutter)
+- **Artifact System** (equip artifacts to modify stats and abilities)
+- **Key System** (find universal keys to unlock shops and mystery rooms)
+
+## Core Systems
+
+- `specializations.json` - All 34 specializations, projectiles, debuffs, combinations
+- `consumables.json` - Match, Rope, Blowtorch, Breaker Bar mechanics
+- `permanent_tools.json` - Legendary tools with limited uses
+- `floors.json` - 5 floor architectures and room distribution
+- `loot_tables.json` - Drop rates and chest contents
+- `artifacts.json` - Artifact system (TBD from yesterday)
+- `shop_economy.json` - Pricing and inventory per floor
+
+## Development Status
+
+- ✅ Specializations locked
+- ✅ Consumables designed
+- ✅ Permanent tools designed
+- ✅ Floor architecture designed
+- ⏳ Artifacts (restore from yesterday's work)
+- ⏳ Stats system (speed, damage, health)
+- ⏳ Enemy design
+- ⏳ Visual design
+
+
+===== FILE: docs/artifacts.json =====
+{
+  "artifact_system": {
+    "description": "Two separate artifact types: Consumable artifacts (permanent stat boost) and Weapon artifacts (2-slot system with infinite craft combinations)",
+    
+    "consumable_artifacts": {
+      "mechanics": {
+        "type": "One-time use, consumed upon pickup",
+        "effect": "Permanent stat boost (stacks)",
+        "stacking": "Multiple of same type stack (2 Burritos = +4 health)",
+        "auto_apply": true,
+        "no_inventory": "Applied immediately, doesn't take inventory space"
+      },
+      
+      "consumable_types": [
+        {
+          "id": "burrito",
+          "name": "Burrito",
+          "icon": "🌯",
+          "effect": "+2 max health",
+          "type": "food",
+          "rarity": "common"
+        },
+        {
+          "id": "energy_drink",
+          "name": "Energy Drink",
+          "icon": "🥤",
+          "effect": "+0.1 speed multiplier",
+          "type": "beverage",
+          "rarity": "common"
+        },
+        {
+          "id": "protein_bar",
+          "name": "Protein Bar",
+          "icon": "🍫",
+          "effect": "+0.05 damage multiplier",
+          "type": "food",
+          "rarity": "uncommon"
+        },
+        {
+          "id": "stimulant",
+          "name": "Stimulant",
+          "icon": "⚡",
+          "effect": "+0.15 speed multiplier",
+          "type": "chemical",
+          "rarity": "rare"
+        },
+        {
+          "id": "steroid",
+          "name": "Steroid",
+          "icon": "💪",
+          "effect": "+0.2 damage multiplier",
+          "type": "chemical",
+          "rarity": "rare"
+        }
+      ],
+
+      "drop_rates": {
+        "normal_room": 0.15,
+        "rare_room": 0.25,
+        "secret_room": 0.35
+      }
+    },
+
+    "weapon_artifacts": {
+      "description": "Modular weapon system. 2 slots that combine for different projectile effects.",
+      "slots": 2,
+      "mechanics": {
+        "both_slots_optional": "Can have 0, 1, or 2 equipped",
+        "slot_combination": "Slot 1 + Slot 2 = combined projectile stats",
+        "single_slot": "One artifact affects projectile in that direction",
+        "empty_slot": "Uses default/specialization projectile"
+      },
+
+      "drop_restriction": {
+        "rule": "Cannot drop weapon artifacts unless you have found 3+",
+        "purpose": "Force early commitment to discovered weapons",
+        "unlock": "Once 3rd artifact found, player can choose which to keep"
+      },
+
+      "combination_system": {
+        "mechanics": "Infinite Craft style - combinations create new base artifacts",
+        "example": {
+          "artifact_a": "Battery",
+          "artifact_b": "Microscope",
+          "combined": "Electron Microscope",
+          "result": "New base artifact added to loot pool at same drop rate",
+          "chaining": "Electron Microscope can combine with other artifacts"
+        },
+        "permanent_unlock": "Once discovered, new artifact is forever available as base drop"
+      },
+
+      "base_weapon_artifacts": [
+        {
+          "id": "battery",
+          "name": "Battery",
+          "icon": "🔋",
+          "description": "Power source. Increases projectile damage.",
+          "stats": {
+            "damage_multiplier": 1.2,
+            "speed_multiplier": 1.0,
+            "effect": null
+          },
+          "rarity": "common",
+          "combinations": [
+            {
+              "with": "Microscope",
+              "creates": "Electron Microscope"
+            },
+            {
+              "with": "Lens",
+              "creates": "Powered Lens"
+            }
+          ]
+        },
+        {
+          "id": "microscope",
+          "name": "Microscope",
+          "icon": "🔬",
+          "description": "Magnification. Increases precision and speed.",
+          "stats": {
+            "damage_multiplier": 1.0,
+            "speed_multiplier": 1.25,
+            "effect": "Smaller, faster projectiles"
+          },
+          "rarity": "common",
+          "combinations": [
+            {
+              "with": "Battery",
+              "creates": "Electron Microscope"
+            },
+            {
+              "with": "Light Source",
+              "creates": "Illuminated Microscope"
+            }
+          ]
+        },
+        {
+          "id": "lens",
+          "name": "Lens",
+          "icon": "🔍",
+          "description": "Focus. Concentrates projectile energy.",
+          "stats": {
+            "damage_multiplier": 1.15,
+            "speed_multiplier": 1.1,
+            "effect": "Focused beam effect"
+          },
+          "rarity": "uncommon",
+          "combinations": [
+            {
+              "with": "Prism",
+              "creates": "Spectroscope"
+            },
+            {
+              "with": "Battery",
+              "creates": "Powered Lens"
+            }
+          ]
+        },
+        {
+          "id": "prism",
+          "name": "Prism",
+          "icon": "🌈",
+          "description": "Refraction. Splits projectiles.",
+          "stats": {
+            "damage_multiplier": 1.0,
+            "speed_multiplier": 1.0,
+            "effect": "Projectiles split into multiple smaller projectiles"
+          },
+          "rarity": "uncommon",
+          "combinations": [
+            {
+              "with": "Lens",
+              "creates": "Spectroscope"
+            },
+            {
+              "with": "Light Source",
+              "creates": "Rainbow Generator"
+            }
+          ]
+        },
+        {
+          "id": "light_source",
+          "name": "Light Source",
+          "icon": "💡",
+          "description": "Illumination. Makes projectiles glow and reveal.",
+          "stats": {
+            "damage_multiplier": 1.05,
+            "speed_multiplier": 1.0,
+            "effect": "Projectiles light up dark areas"
+          },
+          "rarity": "common",
+          "combinations": [
+            {
+              "with": "Microscope",
+              "creates": "Illuminated Microscope"
+            },
+            {
+              "with": "Prism",
+              "creates": "Rainbow Generator"
+            }
+          ]
+        }
+      ],
+
+      "discovered_combinations": [
+        {
+          "id": "electron_microscope",
+          "name": "Electron Microscope",
+          "icon": "⚛️",
+          "description": "Powerful magnification with energy.",
+          "created_from": "Battery + Microscope",
+          "stats": {
+            "damage_multiplier": 1.35,
+            "speed_multiplier": 1.25,
+            "effect": "Fast, powerful projectiles with penetration"
+          },
+          "rarity": "rare",
+          "base_drop_rate": 0.03,
+          "combinations": [
+            {
+              "with": "Lens",
+              "creates": "Ultra Microscope"
+            },
+            {
+              "with": "Prism",
+              "creates": "Quantum Microscope"
+            }
+          ]
+        },
+        {
+          "id": "spectroscope",
+          "name": "Spectroscope",
+          "icon": "📊",
+          "description": "Analysis tool. Creates spectrum projectiles.",
+          "created_from": "Lens + Prism",
+          "stats": {
+            "damage_multiplier": 1.2,
+            "speed_multiplier": 1.15,
+            "effect": "Rainbow projectiles with multi-hit"
+          },
+          "rarity": "rare",
+          "base_drop_rate": 0.03,
+          "combinations": [
+            {
+              "with": "Battery",
+              "creates": "Powered Spectroscope"
+            }
+          ]
+        },
+        {
+          "id": "powered_lens",
+          "name": "Powered Lens",
+          "icon": "⚡🔍",
+          "description": "Energy-focused beam.",
+          "created_from": "Battery + Lens",
+          "stats": {
+            "damage_multiplier": 1.4,
+            "speed_multiplier": 1.1,
+            "effect": "Charged beam projectiles"
+          },
+          "rarity": "rare",
+          "base_drop_rate": 0.03,
+          "combinations": [
+            {
+              "with": "Microscope",
+              "creates": "Ultra Microscope"
+            }
+          ]
+        },
+        {
+          "id": "illuminated_microscope",
+          "name": "Illuminated Microscope",
+          "icon": "💡🔬",
+          "description": "Bright magnification.",
+          "created_from": "Microscope + Light Source",
+          "stats": {
+            "damage_multiplier": 1.1,
+            "speed_multiplier": 1.3,
+            "effect": "Fast, glowing projectiles reveal secrets"
+          },
+          "rarity": "rare",
+          "base_drop_rate": 0.03,
+          "combinations": [
+            {
+              "with": "Lens",
+              "creates": "Revelation Microscope"
+            }
+          ]
+        },
+        {
+          "id": "rainbow_generator",
+          "name": "Rainbow Generator",
+          "icon": "🌈💡",
+          "description": "Colorful spectrum burst.",
+          "created_from": "Prism + Light Source",
+          "stats": {
+            "damage_multiplier": 1.15,
+            "speed_multiplier": 1.2,
+            "effect": "Burst of colorful projectiles"
+          },
+          "rarity": "rare",
+          "base_drop_rate": 0.03,
+          "combinations": [
+            {
+              "with": "Battery",
+              "creates": "Prismatic Cannon"
+            }
+          ]
+        }
+      ],
+
+      "ultra_combinations": [
+        {
+          "id": "ultra_microscope",
+          "name": "Ultra Microscope",
+          "icon": "⚛️🔬",
+          "description": "Ultimate magnification.",
+          "created_from": "Electron Microscope + Lens OR Powered Lens + Microscope",
+          "stats": {
+            "damage_multiplier": 1.5,
+            "speed_multiplier": 1.35,
+            "effect": "Massive penetrating projectiles"
+          },
+          "rarity": "legendary",
+          "base_drop_rate": 0.01
+        },
+        {
+          "id": "quantum_microscope",
+          "name": "Quantum Microscope",
+          "icon": "🌌🔬",
+          "description": "Quantum-scale observation.",
+          "created_from": "Electron Microscope + Prism",
+          "stats": {
+            "damage_multiplier": 1.4,
+            "speed_multiplier": 1.4,
+            "effect": "Projectiles split and recombine"
+          },
+          "rarity": "legendary",
+          "base_drop_rate": 0.01
+        }
+      ]
+    },
+
+    "gameplay_loop": {
+      "early_game": {
+        "scenario": "Start with no weapon artifacts",
+        "projectile": "Uses specialization default (Cell, Atom, Seed Pod, etc.)",
+        "inventory": "0/2 weapon artifact slots"
+      },
+      "first_discovery": {
+        "scenario": "Find Battery",
+        "inventory": "1/2 weapon artifact slots",
+        "effect": "Projectiles now use Battery stats (+20% damage)",
+        "drop_choice": "Cannot drop it yet"
+      },
+      "second_discovery": {
+        "scenario": "Find Microscope",
+        "inventory": "2/2 weapon artifact slots",
+        "effect": "Two options: Equip Microscope in slot 2, or find third artifact to choose",
+        "combination_check": "Battery + Microscope = automatic combo?"
+      },
+      "third_discovery": {
+        "scenario": "Find Lens",
+        "inventory": "Would be 3/2, triggers overflow",
+        "player_choice": "Choose which 2 to keep (Battery, Microscope, or Lens)",
+        "drop_mechanic": "Can now drop one artifact",
+        "combo_happens": "If Battery + Microscope equipped, Electron Microscope created",
+        "result": "2/2 → 1/2 (Electron Microscope takes 1 slot, 1 slot open)"
+      },
+      "mid_game": {
+        "scenario": "Find Prism",
+        "inventory": "Can now equip (1/2)",
+        "result": "Electron Microscope + Prism = Quantum Microscope (if combo exists)",
+        "gameplay": "Greater damage, more variety, different playstyle"
+      }
+    },
+
+    "combo_discovery_rewards": {
+      "philosophy": "Each new combo unlocks permanently in loot tables",
+      "reward": "Combo artifact becomes base drop",
+      "progression": "Players gradually unlock more powerful combinations",
+      "meta_game": "Community discovers new combos over time"
+    }
+  }
+}
+
+
+===== FILE: docs/asset_list.json =====
+{
+  "asset_requirements": {
+    "version": "MVP - 8-bit Pixel Art",
+    "total_assets_needed": 150,
+    "priority": "Game Loop First → Graphics Polish Later"
+  },
+
+  "sprite_sheets": {
+    "player_spritesheet": {
+      "filename": "player.png",
+      "size": "32x32 per frame",
+      "frames_needed": {
+        "idle": 1,
+        "moving_up": 1,
+        "moving_down": 1,
+        "moving_left": 1,
+        "moving_right": 1,
+        "death": 4
+      },
+      "total_frames": 9,
+      "style": "8-bit, green tinted, Science Quest 2 style",
+      "priority": "Medium (can use placeholder)"
+    }
+  },
+
+  "enemy_spritesheets": {
+    "floor_1_lab": {
+      "enemies": [
+        {
+          "id": "runaway_beaker",
+          "filename": "enemy_beaker.png",
+          "size": "32x32",
+          "frames": 4,
+          "animation": "rolling",
+          "colors": ["cyan", "glowing"]
+        },
+        {
+          "id": "centrifuge",
+          "filename": "enemy_centrifuge.png",
+          "size": "32x32",
+          "frames": 6,
+          "animation": "spinning",
+          "colors": ["magenta", "glowing"]
+        },
+        {
+          "id": "bunsen_burner",
+          "filename": "enemy_bunsen.png",
+          "size": "32x32",
+          "frames": 4,
+          "animation": "flame_loop",
+          "colors": ["orange", "red"]
+        },
+        {
+          "id": "petri_dish_bloom",
+          "filename": "enemy_bloom.png",
+          "size": "32x32",
+          "frames": 6,
+          "animation": "pulsing",
+          "colors": ["pink", "bioluminescent"]
+        },
+        {
+          "id": "rolling_stool",
+          "filename": "enemy_stool.png",
+          "size": "32x32",
+          "frames": 4,
+          "animation": "rolling",
+          "colors": ["yellow", "neutral"]
+        },
+        {
+          "id": "spinning_ruler",
+          "filename": "enemy_ruler.png",
+          "size": "32x32",
+          "frames": 8,
+          "animation": "spinning",
+          "colors": ["blue", "neutral"]
+        }
+      ],
+      "total_frames": 32
+    },
+
+    "floor_2_geosphere": {
+      "enemies": [
+        {"id": "crystal_shard_colony", "filename": "enemy_crystal.png", "size": "64x64", "frames": 2},
+        {"id": "pressure_stone", "filename": "enemy_stone.png", "size": "64x64", "frames": 2},
+        {"id": "thermal_vent_chimney", "filename": "enemy_vent.png", "size": "48x48", "frames": 6},
+        {"id": "fault_line_fissure", "filename": "enemy_fault.png", "size": "32x32", "frames": 4},
+        {"id": "tremor_beetle", "filename": "enemy_beetle.png", "size": "40x40", "frames": 4},
+        {"id": "mineral_spike", "filename": "enemy_spike.png", "size": "32x32", "frames": 3}
+      ],
+      "total_frames": 21
+    },
+
+    "floor_3_hydrosphere": {
+      "enemies": [
+        {"id": "primordial_blob", "filename": "enemy_blob.png", "size": "32x32", "frames": 4},
+        {"id": "thermal_vent", "filename": "enemy_thermal_vent.png", "size": "32x32", "frames": 4},
+        {"id": "chemical_reaction", "filename": "enemy_chemical.png", "size": "48x48", "frames": 4},
+        {"id": "proto_swimmer", "filename": "enemy_swimmer.png", "size": "32x32", "frames": 6},
+        {"id": "pressure_squid", "filename": "enemy_squid.png", "size": "40x40", "frames": 4},
+        {"id": "coral_formation", "filename": "enemy_coral.png", "size": "32x32", "frames": 2}
+      ],
+      "total_frames": 24
+    },
+
+    "floor_4_atmosphere": {
+      "enemies": [
+        {"id": "storm_vortex", "filename": "enemy_vortex.png", "size": "48x48", "frames": 8},
+        {"id": "lightning_strike", "filename": "enemy_lightning.png", "size": "32x32", "frames": 4},
+        {"id": "solar_flare", "filename": "enemy_flare.png", "size": "48x48", "frames": 6},
+        {"id": "pressure_wave", "filename": "enemy_wave.png", "size": "64x32", "frames": 4},
+        {"id": "radiation_cell", "filename": "enemy_radiation.png", "size": "32x32", "frames": 4},
+        {"id": "frost_shard", "filename": "enemy_frost.png", "size": "32x32", "frames": 3}
+      ],
+      "total_frames": 29
+    },
+
+    "floor_5_biosphere": {
+      "enemies": [
+        {"id": "predator", "filename": "enemy_predator.png", "size": "40x40", "frames": 6},
+        {"id": "symbiote", "filename": "enemy_symbiote.png", "size": "32x32", "frames": 4},
+        {"id": "consciousness_node", "filename": "enemy_node.png", "size": "48x48", "frames": 4},
+        {"id": "apex", "filename": "enemy_apex.png", "size": "56x56", "frames": 8},
+        {"id": "reality_rift", "filename": "enemy_rift.png", "size": "40x40", "frames": 6},
+        {"id": "void_entity", "filename": "enemy_void.png", "size": "48x48", "frames": 6}
+      ],
+      "total_frames": 34
+    }
+  },
+
+  "boss_spritesheets": {
+    "entropy": {"filename": "boss_entropy.png", "size": "64x64", "frames": 8},
+    "tectonic_titan": {"filename": "boss_tectonic.png", "size": "128x128", "frames": 6},
+    "the_nucleus": {"filename": "boss_nucleus.png", "size": "96x96", "frames": 8},
+    "stellar_furnace": {"filename": "boss_furnace.png", "size": "128x128", "frames": 8},
+    "the_infinitum": {"filename": "boss_infinitum.png", "size": "144x144", "frames": 12}
+  },
+
+  "production_timeline": {
+    "phase_1_gameplay": "Weeks 1-2 (placeholder graphics okay)",
+    "phase_2_content": "Weeks 3-4 (load from JSON, use placeholders)",
+    "phase_3_graphics_start": "Week 5 (start creating sprite sheets)",
+    "phase_4_graphics_finish": "Weeks 6-8 (create all 150+ assets)",
+    "phase_5_polish": "Weeks 9-10 (final balance, juice)",
+    "launch": "Week 11"
+  },
+
+  "notes": {
+    "priority": "Get gameplay right first. Graphics can be updated anytime without touching code.",
+    "hosting": "GitHub Pages auto-deploys on every push to main",
+    "live_link": "https://emerymitchem-png.github.io/The-Lab/"
+  }
+}
+
+
+===== FILE: docs/consumables.json =====
+{
+  "consumables_system": {
+    "description": "Limited-use tools. Limited charges per item. Used to access areas or solve puzzles.",
+    "starting_inventory": {
+      "match": {
+        "quantity": 1,
+        "max_charges": 10
+      },
+      "rope": {
+        "quantity": 1,
+        "max_charges": 10
+      },
+      "blowtorch": {
+        "quantity": 0,
+        "max_charges": 10
+      },
+      "breaker_bar": {
+        "quantity": 0,
+        "max_charges": 8
+      }
+    },
+
+    "consumable_list": [
+      {
+        "id": "match",
+        "name": "Match",
+        "icon": "🔥",
+        "description": "Ignite fire to burn obstacles",
+        "mechanic": "Use to burn fire barriers, ignite combustibles",
+        "use_cases": [
+          "Burn wooden barriers",
+          "Light torches",
+          "Ignite fuel containers"
+        ],
+        "charges_per_find": "1-3",
+        "max_stack": 10,
+        "drop_rate": {
+          "normal_room": 0.08,
+          "rare_room": 0.15,
+          "secret_room": 0.20,
+          "shop_price": 40
+        },
+        "biome_usage": {
+          "floor_1_lab": 0.5,
+          "floor_2_geosphere": 0.3,
+          "floor_3_hydrosphere": 0.2,
+          "floor_4_atmosphere": 0.4,
+          "floor_5_biosphere": 0.3
+        }
+      },
+      {
+        "id": "rope",
+        "name": "Rope",
+        "icon": "🪢",
+        "description": "Cross gaps and chasms",
+        "mechanic": "Use to swing/climb across gaps, reach higher areas",
+        "use_cases": [
+          "Cross bottomless pits",
+          "Swing to unreachable platforms",
+          "Climb vertical obstacles"
+        ],
+        "charges_per_find": "1-3",
+        "max_stack": 10,
+        "drop_rate": {
+          "normal_room": 0.07,
+          "rare_room": 0.15,
+          "secret_room": 0.25,
+          "shop_price": 45
+        },
+        "biome_usage": {
+          "floor_1_lab": 0.4,
+          "floor_2_geosphere": 0.5,
+          "floor_3_hydrosphere": 0.6,
+          "floor_4_atmosphere": 0.3,
+          "floor_5_biosphere": 0.4
+        }
+      },
+      {
+        "id": "blowtorch",
+        "name": "Blowtorch",
+        "icon": "🔥",
+        "description": "Melt ice and cut through materials",
+        "mechanic": "Use to melt ice barriers, cut/burn through sealed structures",
+        "use_cases": [
+          "Melt ice barriers",
+          "Burn through sealed doors",
+          "Heat puzzle mechanisms"
+        ],
+        "charges_per_find": "1-3",
+        "max_stack": 10,
+        "drop_rate": {
+          "normal_room": 0.04,
+          "rare_room": 0.20,
+          "secret_room": 0.30,
+          "shop_price": 60
+        },
+        "biome_usage": {
+          "floor_1_lab": 0.1,
+          "floor_2_geosphere": 0.2,
+          "floor_3_hydrosphere": 0.7,
+          "floor_4_atmosphere": 0.2,
+          "floor_5_biosphere": 0.4
+        }
+      },
+      {
+        "id": "breaker_bar",
+        "name": "Breaker Bar",
+        "icon": "⚒️",
+        "description": "Break through rock and barriers",
+        "mechanic": "Use to smash rock barriers, break sealed containers",
+        "use_cases": [
+          "Smash rock walls",
+          "Break through mineral barriers",
+          "Crack open sealed chests/boxes"
+        ],
+        "charges_per_find": "1-2",
+        "max_stack": 8,
+        "drop_rate": {
+          "normal_room": 0.02,
+          "rare_room": 0.12,
+          "secret_room": 0.20,
+          "shop_price": 55
+        },
+        "biome_usage": {
+          "floor_1_lab": 0.2,
+          "floor_2_geosphere": 0.8,
+          "floor_3_hydrosphere": 0.1,
+          "floor_4_atmosphere": 0.3,
+          "floor_5_biosphere": 0.5
+        }
+      }
+    ],
+
+    "drop_rates_by_room": {
+      "normal_room": {
+        "total_drop_chance": 0.20,
+        "breakdown": {
+          "match": 0.08,
+          "rope": 0.07,
+          "blowtorch": 0.04,
+          "breaker_bar": 0.01
+        }
+      },
+      "rare_room": {
+        "total_drop_chance": 0.50,
+        "breakdown": {
+          "match": 0.10,
+          "rope": 0.15,
+          "blowtorch": 0.15,
+          "breaker_bar": 0.10
+        }
+      },
+      "secret_room": {
+        "total_drop_chance": 0.90,
+        "breakdown": {
+          "match": 0.15,
+          "rope": 0.25,
+          "blowtorch": 0.30,
+          "breaker_bar": 0.20
+        }
+      },
+      "hidden_chest": {
+        "total_drop_chance": 1.0,
+        "breakdown": {
+          "match": 0.10,
+          "rope": 0.35,
+          "blowtorch": 0.40,
+          "breaker_bar": 0.15
+        }
+      }
+    },
+
+    "shop_consumables_by_floor": {
+      "floor_1": {
+        "match": {
+          "charges": 3,
+          "price": 40
+        },
+        "rope": {
+          "charges": 3,
+          "price": 45
+        }
+      },
+      "floor_2": {
+        "match": {
+          "charges": 3,
+          "price": 40
+        },
+        "rope": {
+          "charges": 3,
+          "price": 45
+        },
+        "blowtorch": {
+          "charges": 3,
+          "price": 60
+        }
+      },
+      "floor_3": {
+        "match": {
+          "charges": 3,
+          "price": 45
+        },
+        "rope": {
+          "charges": 3,
+          "price": 50
+        },
+        "blowtorch": {
+          "charges": 3,
+          "price": 65
+        },
+        "breaker_bar": {
+          "charges": 2,
+          "price": 55
+        }
+      },
+      "floor_4": {
+        "match": {
+          "charges": 4,
+          "price": 50
+        },
+        "rope": {
+          "charges": 4,
+          "price": 55
+        },
+        "blowtorch": {
+          "charges": 4,
+          "price": 70
+        },
+        "breaker_bar": {
+          "charges": 3,
+          "price": 60
+        }
+      },
+      "floor_5": {
+        "match": {
+          "charges": 5,
+          "price": 60
+        },
+        "rope": {
+          "charges": 5,
+          "price": 65
+        },
+        "blowtorch": {
+          "charges": 5,
+          "price": 80
+        },
+        "breaker_bar": {
+          "charges": 4,
+          "price": 70
+        }
+      }
+    },
+
+    "inventory_mechanics": {
+      "consumable_slots": 4,
+      "slot_equipment": [
+        {
+          "slot": 1,
+          "item_type": "match",
+          "max_charges": 10
+        },
+        {
+          "slot": 2,
+          "item_type": "rope",
+          "max_charges": 10
+        },
+        {
+          "slot": 3,
+          "item_type": "blowtorch",
+          "max_charges": 10
+        },
+        {
+          "slot": 4,
+          "item_type": "breaker_bar",
+          "max_charges": 8
+        }
+      ],
+      "mechanics": {
+        "on_use": "Deduct 1 charge from item",
+        "at_zero_charges": "Item grayed out, can't use",
+        "refind_item": "Add charges back to that slot",
+        "permanent_tool_override": "If permanent tool found, replaces consumable slot with limited uses (50-999 depending on tool)"
+      }
+    }
+  }
+}
+
+
+===== FILE: docs/enemies.json =====
+{
+  "enemy_system": {
+    "philosophy": "Enemy evolution mirrors floor progression. Simple → Complex → Intelligent. Each floor has unique enemy archetypes + 1 boss.",
+    "combat_style": "Twin-stick roguelike. Kiting, positioning, pattern learning. Emergent interactions between enemies and hazards.",
+    
+    "floor_1_lab": {
+      "floor": 1,
+      "biome": "The Infinite Lab",
+      "era": "Modern Day",
+      "theme": "Equipment gone wrong. Simple mechanics. Playful but grimdark.",
+      "visual_palette": "Whites, grays, blacks with neon pink/blue accents. Clean geometric rooms, metal surfaces, glass, plastic.",
+      "feel": "Playful, scientific, no real threat. Learning space.",
+      
+      "enemies": [
+        {
+          "id": "runaway_beaker",
+          "name": "Runaway Beaker",
+          "icon": "🧪",
+          "description": "Lab equipment rolling out of control",
+          "type": "Rolling Hazard",
+          "behavior": "Rolls toward you, accelerates each turn",
+          "attack": {
+            "contact_damage": "5 dmg (slow) → 12 dmg (fast) → 18 dmg (very fast)",
+            "knockback": false,
+            "effect": "Leaves puddles of liquid as it rolls (slow you down)"
+          },
+          "health": 25,
+          "spawn_rate": "Common",
+          "strategy": "Bait into walls, attack during recovery. Use puddles tactically.",
+          "twist": "Can hit other enemies (use as weapon). Puddles slow YOU too (risk/reward)."
+        },
+        {
+          "id": "centrifuge",
+          "name": "Centrifuge",
+          "icon": "⚙️",
+          "description": "Laboratory centrifuge spinning rapidly",
+          "type": "Stationary Spray",
+          "behavior": "Stationary, spins in place constantly",
+          "attack": {
+            "pattern": "5 projectiles in rotating circular spray every 1.5 sec",
+            "projectiles_per_attack": 5,
+            "damage_per_projectile": 3,
+            "mechanic": "Gaps between spray lines you can squeeze through"
+          },
+          "health": 35,
+          "spawn_rate": "Common",
+          "strategy": "Predict spray gaps, position diagonally. Spray speed increases over time.",
+          "twist": "Projectiles bounce off obstacles. Multiple centrifuges can sync (chaos)."
+        },
+        {
+          "id": "bunsen_burner",
+          "name": "Bunsen Burner",
+          "icon": "🔥",
+          "description": "Lab burner with uncontrolled flame",
+          "type": "Stationary Flame",
+          "behavior": "Stationary, rotates to face you",
+          "attack": {
+            "pattern": "Wide flame cone (120 degree arc) every 1.2 sec",
+            "coverage": "Large area, slow movement",
+            "damage_per_tick": 4,
+            "mechanic": "Flame lingers briefly, creating temporary hazard zones"
+          },
+          "health": 30,
+          "spawn_rate": "Common",
+          "strategy": "Move perpendicular to flame (strafe). Attack from sides.",
+          "twist": "Flame ignites other enemies. Room temperature rises (activates other hazards)."
+        },
+        {
+          "id": "petri_dish_bloom",
+          "name": "Petri Dish Bloom",
+          "icon": "🧫",
+          "description": "Fractal bacterial colony - splits when hit",
+          "type": "Fractal Enemy (Signature)",
+          "tier_1_original": {
+            "size": "Medium (15% screen)",
+            "health": 40,
+            "behavior": "Drifts slowly toward you",
+            "attack": "Shoots 3 small bloom spores every 1 sec",
+            "spore_damage": 2,
+            "spore_duration": "4 sec before dissipate"
+          },
+          "tier_2_medium": {
+            "spawn_count": 2,
+            "health_per": 20,
+            "behavior": "Moves at same speed as original",
+            "attack": "Shoots 2 spores every 1.5 sec",
+            "spore_size": "Larger than tier 1"
+          },
+          "tier_3_small": {
+            "spawn_count": 4,
+            "health_per": 10,
+            "behavior": "Slower movement",
+            "attack": "Shoots 1 spore every 2 sec",
+            "spore_size": "Tiny"
+          },
+          "strategy": {
+            "aggressive": "Kill original quickly before splits (7 sec window)",
+            "methodical": "Let splits happen, manage multi-tier threats",
+            "ranged": "Pick off spores as they come (safest, slowest)"
+          },
+          "spawn_rate": "Uncommon",
+          "difficulty": "Medium-Hard (most complex Floor 1 enemy)",
+          "twist": "Spores can fertilize other blooms (cause faster splits). Fragments can merge if you're careless."
+        },
+        {
+          "id": "rolling_stool",
+          "name": "Rolling Stool",
+          "icon": "🪑",
+          "description": "Lab stool on wheels, erratically bouncing",
+          "type": "Chaotic Mobile",
+          "behavior": "Rolls erratically, bounces around, no predictable path",
+          "attack": {
+            "contact_damage": 5,
+            "no_direct_attacks": true,
+            "effect": "Just collision threat"
+          },
+          "health": 22,
+          "spawn_rate": "Uncommon",
+          "strategy": "Predict patterns (they emerge after observation). Use obstacles to funnel it.",
+          "twist": "Collides with other enemies (pushes them). Can use stool as dynamic obstacle."
+        },
+        {
+          "id": "spinning_ruler",
+          "name": "Spinning Ruler",
+          "icon": "📏",
+          "description": "Wooden ruler spinning rapidly on desk",
+          "type": "Stationary Barrier",
+          "behavior": "Stationary, spins in place, blocks movement",
+          "attack": {
+            "contact_damage": 6,
+            "when_spinning": "Always dangerous",
+            "recovery_frames": false
+          },
+          "health": 28,
+          "spawn_rate": "Easy",
+          "strategy": "Attack from gaps between ruler edges. Use it as cover from OTHER enemies' attacks.",
+          "twist": "Blocks both your AND enemy projectiles (double-edged). Multiple rulers can synchronize."
+        }
+      ],
+      
+      "boss": {
+        "id": "entropy",
+        "name": "Entropy",
+        "subtitle": "Disorder in the Lab",
+        "icon": "🌀",
+        "narrative": "Lab equipment breaking down. Entropy (disorder) consuming everything.",
+        "appearance": "Vortex of dissolving lab equipment (beakers, tubes, papers swirling). Purple + neon pink. Center is dark, edges show destruction.",
+        
+        "behavior": "Stationary vortex in center of arena",
+        "attack_patterns": {
+          "phase_1": {
+            "health_range": "40-27 HP",
+            "pattern": "8 equipment fragments in circular spread, rotating slowly",
+            "frequency": "1 spiral every 2 sec",
+            "projectiles": "3 damage each",
+            "mechanic": "Gaps between projectiles you can move through"
+          },
+          "phase_2": {
+            "health_range": "27-1 HP",
+            "pattern": "Spiral rotates FASTER (harder prediction)",
+            "secondary_attack": "Spawns small Spilled Liquid entities drifting outward",
+            "frequency": "1 spiral + 1 spawn every 1.5 sec",
+            "damage": "3 per fragment, 1/sec from liquid trails"
+          }
+        },
+        
+        "health": 40,
+        "phases": 1,
+        "difficulty": "Medium (first boss, learnable)",
+        "time_to_beat": "60-90 seconds with good play",
+        
+        "strategy": {
+          "phase_1": "Learn spiral rhythm, find gaps, circle around",
+          "phase_2": "Spawn-prioritize (clear liquids first), manage fragments"
+        },
+        
+        "visual_progression": "Boss grows more chaotic as phase progresses. Equipment visible inside vortex.",
+        "victory_feel": "Pattern mastery. System restored."
+      },
+
+      "hazards": [
+        {
+          "type": "electrical_sparks",
+          "description": "Occasional damage zones from broken equipment",
+          "damage": 0.5,
+          "frequency": "Low"
+        },
+        {
+          "type": "chemical_spills",
+          "description": "Puddles that damage over time",
+          "damage": 0.3,
+          "duration": "Until room cleared"
+        }
+      ],
+      
+      "hazard_philosophy": "Mostly safe. Focus on combat.",
+      "difficulty_tier": 1
+    },
+
+    "floor_2_geosphere": {
+      "floor": 2,
+      "biome": "The Rocky Depths",
+      "era": "3.8 Billion Years Ago",
+      "theme": "Ancient rocks, minerals, geological forces. Heavy, tanky, slow but devastating.",
+      "visual_palette": "Browns, grays, golds, reds. Jagged rocky rooms, crystal formations. Lava glows orange/red. Deep, ancient, solid.",
+      "feel": "Heavy, immovable, geological power. Positioning around LARGE objects.",
+      
+      "enemies": [
+        {
+          "id": "crystal_shard_colony",
+          "name": "Crystal Shard Colony",
+          "icon": "💎",
+          "description": "Cluster of glowing crystals jutting from ground",
+          "type": "Stationary Turret",
+          "behavior": "Stationary (rooted), shoots in multiple directions",
+          "attack": {
+            "pattern": "4 LARGE crystal shards in cardinal directions (N/S/E/W)",
+            "shard_size": "20% screen each",
+            "damage": 8,
+            "speed": "Slow but hard-hitting",
+            "knockback": true,
+            "rotation": "Every 2 sec, rotates 45 degrees",
+            "visual_spectacle": "After 3 rotations, explodes into smaller crystals briefly"
+          },
+          "health": 60,
+          "spawn_rate": "Common",
+          "strategy": "Attack from diagonal angles between shard lines. Position in safety zones. Kite indefinitely.",
+          "twist": "Shards embed in walls (create obstacles). Embedded crystals reflect YOUR projectiles (hazard)."
+        },
+        {
+          "id": "pressure_stone",
+          "name": "Pressure Stone",
+          "icon": "⚫",
+          "description": "Massive rounded boulder with stress fractures",
+          "type": "Mobile Juggernaut",
+          "behavior": "Moves slowly but RELENTLESSLY toward you. Never stops.",
+          "attack": {
+            "contact_damage": 12,
+            "effect": "Massive knockback (sends you flying)",
+            "secondary": "Leaves cracks in ground as it moves (create obstacles)"
+          },
+          "crack_mechanic": {
+            "damage": "3 dmg/sec standing on cracks",
+            "persistence": "Until arena fills with cracks",
+            "hazard_escalation": "Stone gets FASTER as cracks fill arena"
+          },
+          "health": 75,
+          "spawn_rate": "Common",
+          "strategy": "Lead into obstacles, use as barriers. Attack from sides while passing. Bait into crushing other enemies.",
+          "twist": "If stone hits another stone, they MERGE (larger threat). Cracks become impassable (spatial lock)."
+        },
+        {
+          "id": "thermal_vent_chimney",
+          "name": "Thermal Vent Chimney",
+          "icon": "🌋",
+          "description": "Vertical rock column with steam radiating visibly",
+          "type": "Stationary Eruption",
+          "behavior": "Stationary (anchored). Erupts periodically.",
+          "attack": {
+            "eruption_frequency": "Every 3 sec",
+            "pattern": "Expanding shockwave in ALL directions",
+            "damage": 7,
+            "knockback": true,
+            "aftermath": "Leaves hot zone (2 dmg/sec standing in it)",
+            "zone_duration": "8 sec, gradually cools"
+          },
+          "health": 45,
+          "spawn_rate": "Uncommon",
+          "strategy": "Time attacks between eruptions. When eruption happens, move TOWARD vent (safest zone is center). Attack from hot zones (risky but effective).",
+          "twist": "Multiple vents create LAYERED eruptions (cascading waves). If vents sync, massive combined shockwave (devastating)."
+        },
+        {
+          "id": "fault_line_fissure",
+          "name": "Fault Line Fissure",
+          "icon": "⛰️",
+          "description": "Self-propagating crack system - creates geometry",
+          "type": "Fractal Enemy (Signature)",
+          "tier_1_primary": {
+            "size": "Large diagonal crack",
+            "health": 50,
+            "behavior": "Moves slowly in one direction, creates cracks",
+            "attack": "Contact: 8 dmg. Cracks left behind: 2 dmg/sec",
+            "crack_mechanic": "Cracks block movement (must navigate around)",
+            "spawn_secondary": "Every 2 sec, splits off secondary fault"
+          },
+          "tier_2_secondary": {
+            "spawn_count": "2-3",
+            "health_per": 30,
+            "behavior": "Moves in slightly different direction",
+            "attack": "Shoots smaller crack projectiles forward",
+            "cracks_created": "Smaller cracks (1 dmg/sec, 6 sec duration)"
+          },
+          "tier_3_minor": {
+            "spawn_count": "4-6",
+            "health_per": 15,
+            "behavior": "Mostly stationary",
+            "attack": "Shoots mini-crack projectiles slowly",
+            "cracks_created": "Tiny cracks (0.5 dmg/sec, 3 sec)"
+          },
+          "intersection_mechanic": {
+            "effect": "When faults cross, HIGH-DAMAGE ZONES appear (5 dmg/sec)",
+            "impassable": "Intersections block everything",
+            "strategic": "Can create intentional sealed zones"
+          },
+          "spawn_rate": "Uncommon",
+          "difficulty": "Hard (complex spatial management)",
+          "strategy": {
+            "containment": "Kill primary quickly before splits",
+            "navigation": "Let faults split, use pattern as cover",
+            "spatial_lock": "Let faults fill arena (high-risk, forces aggression)"
+          },
+          "twist": "Faults create 'sealed zones' (completely surrounded by cracks). Faults can collide with other enemies (push them, create chains)."
+        },
+        {
+          "id": "tremor_beetle",
+          "name": "Tremor Beetle",
+          "icon": "🪲",
+          "description": "Giant crystalline beetle with bioluminescent spots",
+          "type": "Mobile Shockwave",
+          "behavior": "Mobile, moves erratically. Stomps periodically.",
+          "attack": {
+            "contact_damage": 6,
+            "stomp_attack": "Shockwave in 360 arc, 5 dmg, knockback",
+            "stun": "Brief stun (0.5 sec) if hit by stomp",
+            "frequency": "Every 1.5 sec"
+          },
+          "health": 35,
+          "spawn_rate": "Uncommon",
+          "strategy": "Timing-based: dodge stomps, attack during wind-up. When beetle stomps, briefly vulnerable (recovery frames). Bait stomps into walls.",
+          "twist": "Multiple beetles create RESONANT STOMPS (amplify each other). If beetles stomp in sync, massive combined shockwave (devastating). Beetle shells partially reflect projectiles (armor)."
+        },
+        {
+          "id": "mineral_spike",
+          "name": "Mineral Spike",
+          "icon": "🔺",
+          "description": "Sharp mineral formation jutting from ground",
+          "type": "Passive Hazard Enemy",
+          "behavior": "Mostly stationary, grows/shrinks periodically",
+          "attack": {
+            "contact_damage": 8,
+            "growth_cycle": "Expands then retracts every 3 sec",
+            "expansion": "Takes up more space (blocks movement)",
+            "retraction": "Creates window to attack or pass"
+          },
+          "health": 32,
+          "spawn_rate": "Common",
+          "strategy": "Time movement/attacks to expansion cycle. Attack during retraction. Use expanded state as cover.",
+          "twist": "Multiple spikes can interlock (create impossible geometry). Growing spikes can crush other enemies."
+        }
+      ],
+      
+      "boss": {
+        "id": "tectonic_titan",
+        "name": "Tectonic Titan",
+        "subtitle": "Earth's Power",
+        "icon": "🏔️",
+        "narrative": "Raw geological force moving through the world.",
+        "appearance": "Massive animated stone/mountain entity. Cracks visible on surface. Ominous, immovable.",
+        
+        "behavior": "Mobile, slow, devastating. Charges at player",
+        "attack_patterns": {
+          "charge_attack": {
+            "description": "Builds up then charges in straight line",
+            "damage": 15,
+            "knockback": "Massive"
+          },
+          "earthquake_waves": {
+            "description": "Creates earthquake waves across entire screen",
+            "pattern": "Multiple radial waves emanating from boss",
+            "damage": 5,
+            "frequency": "Every 4 sec"
+          },
+          "shockwave_aftermath": {
+            "description": "After earthquake, creates cracks in terrain",
+            "effect": "Restricts movement space"
+          }
+        },
+        
+        "health": 80,
+        "phases": 1,
+        "scaling": "2x Entropy boss",
+        "difficulty": "Hard",
+        "time_to_beat": "90-120 seconds with good play",
+        
+        "strategy": "Dodge charges by moving perpendicular. Use terrain to block charges. Attack from sides during recovery.",
+        "visual_progression": "Boss cracks intensify. Ground destabilizes."
+      },
+
+      "hazards": [
+        {
+          "type": "lava_pools",
+          "description": "Instant high damage zones",
+          "damage": 3.0,
+          "avoidable": true
+        },
+        {
+          "type": "earthquakes",
+          "description": "Screen shakes, cracks appear that trap you",
+          "damage": 0.5,
+          "mechanic": "Movement restriction during tremors"
+        },
+        {
+          "type": "pressure_zones",
+          "description": "Deep areas slow you significantly",
+          "damage": 0.2,
+          "mechanic": "Reduced speed multiplier"
+        },
+        {
+          "type": "collapsing_terrain",
+          "description": "Stands crumble, must move to avoid",
+          "damage": 2.0,
+          "mechanic": "Environmental puzzle element"
+        }
+      ],
+      
+      "hazard_philosophy": "Heavy, dangerous terrain. Must navigate carefully. Spatial awareness critical.",
+      "difficulty_tier": 2
+    },
+
+    "floor_3_hydrosphere": {
+      "floor": 3,
+      "biome": "The Flooded Depths",
+      "era": "2.4 Billion Years Ago",
+      "theme": "Fluid, reactive, proto-biological. Alive but alien. Unpredictable.",
+      "visual_palette": "Deep blues, teals, purples. Murky water, bioluminescent greens/yellows. Primordial feeling. Pressure visible.",
+      "feel": "Alive but alien, unpredictable. Survival mechanic layer (air, pressure, currents).",
+      
+      "enemies": [
+        {
+          "id": "primordial_blob",
+          "name": "Primordial Blob",
+          "icon": "💧",
+          "description": "Amorphous mass that splits when hit",
+          "type": "Splitting Propagator",
+          "behavior": "Drifts, splits when damaged",
+          "attack": {
+            "contact_damage": 2,
+            "spread": "Contaminates area",
+            "splitting": "When hit, splits into 2 smaller versions (creates tactical choice)"
+          },
+          "health": 8,
+          "spawn_rate": "Common",
+          "strategy": "Either kill quickly before splits or manage all fragments. Tactical choice each room.",
+          "twist": "Splits create smaller threats but also more projectile targets. Can use splits against other enemies."
+        },
+        {
+          "id": "thermal_vent",
+          "name": "Thermal Vent",
+          "icon": "🌊",
+          "description": "Stationary vent shooting hot water",
+          "type": "Stationary Spray",
+          "behavior": "Anchored to location, shoots projectiles",
+          "attack": {
+            "pattern": "Ranged hot water projectiles",
+            "debuff": "Burning",
+            "frequency": "Regular bursts"
+          },
+          "health": 10,
+          "spawn_rate": "Common",
+          "strategy": "Avoid spray zones. Attack from sides or when vent recovers.",
+          "twist": "Heat can ignite other enemies or environmental elements."
+        },
+        {
+          "id": "chemical_reaction",
+          "name": "Chemical Reaction",
+          "icon": "⚗️",
+          "description": "Spreading chemical cloud that contaminates",
+          "type": "Area Controller",
+          "behavior": "Expanding cloud that spreads across arena",
+          "attack": {
+            "persistent_zone": "Damage zone, poison debuff",
+            "spread_mechanic": "Grows over time, blocks movement",
+            "containment": "Can be blocked by obstacles"
+          },
+          "health": 6,
+          "spawn_rate": "Uncommon",
+          "strategy": "Kill quickly before it covers too much space. Funnel it into corners. Use room layout defensively.",
+          "twist": "Can combine with other hazards (reacts with lava, electricity). Enemies touching it become poisoned (extra damage to them)."
+        },
+        {
+          "id": "proto_swimmer",
+          "name": "Proto-Swimmer",
+          "icon": "🐟",
+          "description": "Fast, erratic, first 'alive' feeling entity",
+          "type": "Intelligent Mobile",
+          "behavior": "Quick, unpredictable movement patterns (first truly 'intelligent' enemy)",
+          "attack": {
+            "swift_strikes": "Hard to predict",
+            "contact_damage": 0.9,
+            "pattern": "Erratic, adapts to player"
+          },
+          "health": 7,
+          "spawn_rate": "Uncommon",
+          "difficulty": "Medium (feels different from Floor 1/2)",
+          "strategy": "Requires quick reflexes. Pattern observation critical.",
+          "twist": "First enemy that feels like it's 'learning' your moves."
+        },
+        {
+          "id": "pressure_squid",
+          "name": "Pressure Squid",
+          "icon": "🦑",
+          "description": "Deep-sea creature with pressure aura",
+          "type": "Mobile Aura",
+          "behavior": "Moves around, radiates pressure field",
+          "attack": {
+            "contact_damage": 5,
+            "aura_effect": "Radius around it applies pressure debuff (slows + damage)",
+            "debuff_range": "Large area"
+          },
+          "health": 20,
+          "spawn_rate": "Uncommon",
+          "strategy": "Attack from outside aura range. Create distance.",
+          "twist": "Multiple squids' auras can stack (creates hazardous zones). Aura can crush other enemies."
+        },
+        {
+          "id": "coral_formation",
+          "name": "Coral Formation",
+          "icon": "🪸",
+          "description": "Growing coral that blocks movement",
+          "type": "Passive Barrier",
+          "behavior": "Mostly stationary, grows periodically",
+          "attack": {
+            "contact_damage": 3,
+            "growth": "Expands, blocking routes",
+            "shrinkage": "Creates window to pass"
+          },
+          "health": 18,
+          "spawn_rate": "Common",
+          "strategy": "Time movement to growth cycles. Attack during shrinkage windows.",
+          "twist": "Can create temporary walls that block enemy movement (advantage to you)."
+        }
+      ],
+      
+      "boss": {
+        "id": "the_nucleus",
+        "name": "The Nucleus",
+        "subtitle": "First Life",
+        "icon": "🧬",
+        "narrative": "Life emerges from chaos. Primordial cell consciousness.",
+        "appearance": "Large glowing cell with visible organelles inside. Bioluminescent. Alien but alive.",
+        
+        "behavior": "Starts as single large cell. Spawns organelle enemies around it. When damaged enough, splits.",
+        "attack_patterns": {
+          "phase_1": {
+            "health_range": "120-61 HP",
+            "pattern": "Releases organelle projectiles",
+            "spreads_contamination": true,
+            "frequency": "Regular bursts"
+          },
+          "phase_2": {
+            "health_range": "60-1 HP",
+            "behavior": "Splits into smaller nuclei (2-3 spawn)",
+            "mechanic": "Each nucleus shoots independently",
+            "coordination": "Nuclei try to surround player"
+          }
+        },
+        
+        "health": 120,
+        "phases": 2,
+        "scaling": "1.5x Tectonic boss",
+        "difficulty": "Hard",
+        "time_to_beat": "120-150 seconds with good play",
+        
+        "strategy": {
+          "phase_1": "Learn spray rhythm, dodge projectiles, damage nucleus",
+          "phase_2": "Manage multiple nuclei, choose which to prioritize"
+        },
+        
+        "visual_progression": "Nucleus glows brighter. Organelles become more visible. Split is visually spectacular."
+      },
+
+      "hazards": [
+        {
+          "type": "drowning",
+          "description": "Stay underwater too long = damage",
+          "damage": 1.0,
+          "mechanic": "Must surface for air periodically"
+        },
+        {
+          "type": "pressure_damage",
+          "description": "Deeper zones deal more damage",
+          "damage": 0.5,
+          "scaling": "Increases with depth"
+        },
+        {
+          "type": "toxic_clouds",
+          "description": "Chemical hazard clouds",
+          "damage": 0.7,
+          "mechanic": "Poison debuff on contact"
+        },
+        {
+          "type": "currents",
+          "description": "Push you in directions, hard to resist",
+          "damage": 0,
+          "mechanic": "Movement redirection puzzle"
+        }
+      ],
+      
+      "hazard_philosophy": "Must manage air, pressure, currents. Survival layer adds complexity.",
+      "difficulty_tier": 3
+    },
+
+    "floor_4_atmosphere": {
+      "floor": 4,
+      "biome": "The Tempest",
+      "era": "540 Million Years Ago",
+      "theme": "Weather, energy, chaos. Fast, explosive, dangerous.",
+      "visual_palette": "Bright yellows, electric blues, storm grays. High energy, particle effects. Clouds, lightning, radiation.",
+      "feel": "Chaotic, dangerous, high-energy. Reflexes and prediction critical.",
+      
+      "enemies": [
+        {
+          "id": "storm_vortex",
+          "name": "Storm Vortex",
+          "icon": "🌪️",
+          "description": "Spinning entity creating wind pushback",
+          "type": "Mobile Wind",
+          "behavior": "Rotates, creates wind effects",
+          "attack": {
+            "pushback_damage": "Knockback effect",
+            "contact_damage": 0.8,
+            "effect": "Can throw you off-balance"
+          },
+          "health": 11,
+          "spawn_rate": "Common",
+          "strategy": "Use wind pushback tactically. Position yourself.",
+          "twist": "Wind can push other enemies (create chain reactions)."
+        },
+        {
+          "id": "lightning_strike",
+          "name": "Lightning Strike",
+          "icon": "⚡",
+          "description": "Fast teleporting striker",
+          "type": "Teleporter",
+          "behavior": "Teleports around, instant strikes",
+          "attack": {
+            "dash_attacks": "High-speed strikes",
+            "contact_damage": 1.3,
+            "predictability": "Requires quick reflexes"
+          },
+          "health": 9,
+          "spawn_rate": "Common",
+          "difficulty": "Medium (unpredictable)",
+          "strategy": "Pattern recognition. Where WILL it strike next?",
+          "twist": "Can chain strike between enemies (create cascades)."
+        },
+        {
+          "id": "solar_flare",
+          "name": "Solar Flare",
+          "icon": "☀️",
+          "description": "Burst damage radiating outward",
+          "type": "Exploding Burst",
+          "behavior": "Periodically releases energy burst",
+          "attack": {
+            "explosion": "Damage in radius",
+            "debuff": "Burning",
+            "frequency": "Periodic"
+          },
+          "health": 12,
+          "spawn_rate": "Uncommon",
+          "strategy": "Predict burst timing, move away before explosion.",
+          "twist": "Explosions can trigger other enemies' attacks (cause chains)."
+        },
+        {
+          "id": "pressure_wave",
+          "name": "Pressure Wave",
+          "icon": "〰️",
+          "description": "Sound/force entity creating linear shockwaves",
+          "type": "Linear Sweeper",
+          "behavior": "Creates shockwave walls that move across screen",
+          "attack": {
+            "pattern": "Linear damage zone",
+            "knockback": true,
+            "frequency": "Regular intervals"
+          },
+          "health": 10,
+          "spawn_rate": "Uncommon",
+          "strategy": "Dodge predictable wave patterns. Pattern-based challenge.",
+          "twist": "Waves can resonate (amplify each other if multiple)."
+        },
+        {
+          "id": "radiation_cell",
+          "name": "Radiation Cell",
+          "icon": "☢️",
+          "description": "Glowing radioactive entity",
+          "type": "Mobile Radiation",
+          "behavior": "Drifts around, radiates constantly",
+          "attack": {
+            "aura_damage": "Continuous radiation zone",
+            "contact_damage": 4,
+            "avoidance": "Must maintain distance"
+          },
+          "health": 14,
+          "spawn_rate": "Uncommon",
+          "strategy": "Keep distance, attack from range. Avoid aura.",
+          "twist": "Aura can combine with other radiation (hazard escalation)."
+        },
+        {
+          "id": "frost_shard",
+          "name": "Frost Shard",
+          "icon": "❄️",
+          "description": "Crystalline ice formation",
+          "type": "Slowing Hazard",
+          "behavior": "Mobile or stationary, emits cold",
+          "attack": {
+            "cold_effect": "Slows movement",
+            "contact_damage": 3,
+            "debuff": "Freeze (strong slow)"
+          },
+          "health": 15,
+          "spawn_rate": "Common",
+          "strategy": "Attack while mobile, avoid contact.",
+          "twist": "Cold can freeze other enemies (create tactical advantage)."
+        }
+      ],
+      
+      "boss": {
+        "id": "stellar_furnace",
+        "name": "Stellar Furnace",
+        "subtitle": "Energy Enabling Life",
+        "icon": "🔥",
+        "narrative": "Sun's power drives everything. Core of all energy.",
+        "appearance": "Massive burning sphere radiating heat. Waves of energy visible. Ominous but beautiful.",
+        
+        "behavior": "Stationary burning sphere. Radiates heat waves. Charges for major burst attacks.",
+        "attack_patterns": {
+          "radiating_patterns": {
+            "description": "Waves of heat radiating outward in patterns",
+            "damage": 5,
+            "frequency": "Every 3 sec"
+          },
+          "charged_burst": {
+            "description": "Builds up then releases massive burst",
+            "damage": 12,
+            "area": "Large radius"
+          },
+          "pattern_variation": "Patterns change mid-fight (keeps you guessing)"
+        },
+        
+        "health": 160,
+        "phases": 1,
+        "scaling": "1.33x Nucleus boss",
+        "difficulty": "Hard",
+        "time_to_beat": "120-150 seconds with good play",
+        
+        "strategy": "Learn heat wave patterns. Predict bursts. Attack during recovery.",
+        "visual_progression": "Furnace burns brighter. Heat waves become more intense."
+      },
+
+      "hazards": [
+        {
+          "type": "radiation_zones",
+          "description": "Damage over time, must find safe zones",
+          "damage": 0.6,
+          "mechanic": "Must avoid or find protection"
+        },
+        {
+          "type": "extreme_cold",
+          "description": "Slows movement significantly",
+          "damage": 0.2,
+          "mechanic": "Speed reduction debuff"
+        },
+        {
+          "type": "strong_winds",
+          "description": "Push you, hard to resist",
+          "damage": 0,
+          "mechanic": "Movement redirection, requires positioning"
+        },
+        {
+          "type": "low_gravity_zones",
+          "description": "Floaty movement, different physics",
+          "damage": 0,
+          "mechanic": "Mobility challenge, higher jumps"
+        }
+      ],
+      
+      "hazard_philosophy": "Energy hazards, environmental physics puzzle. Fast-paced.",
+      "difficulty_tier": 4
+    },
+
+    "floor_5_biosphere": {
+      "floor": 5,
+      "biome": "The Origin",
+      "era": "Present Day (and Beyond)",
+      "theme": "Complex, intelligent, evolved. ALL SYSTEMS AT ONCE. Chaos and mastery.",
+      "visual_palette": "Every color, organic shapes. Living forests, vines, symbiotic structures. Reality shifts. Impossible geometry.",
+      "feel": "Intelligent, adaptive, pinnacle of evolution. PURE CHAOS. Final exam.",
+      
+      "enemies": [
+        {
+          "id": "predator",
+          "name": "Predator",
+          "icon": "🦁",
+          "description": "Hunts you intelligently, learns patterns",
+          "type": "Adaptive Hunter",
+          "behavior": "Adapts to player behavior mid-fight",
+          "attack": {
+            "intelligent_targeting": "Predicts your moves",
+            "predicted_strikes": "Hard to evade",
+            "learning": "Gets smarter as player repeats actions"
+          },
+          "health": 14,
+          "spawn_rate": "Common",
+          "difficulty": "Hard (feels alive)",
+          "strategy": "Change tactics. Don't be predictable.",
+          "twist": "First enemy that feels like true opposition."
+        },
+        {
+          "id": "symbiote",
+          "name": "Symbiote",
+          "icon": "🧬",
+          "description": "Merges with other enemies, strengthens them",
+          "type": "Tactical Support",
+          "behavior": "Seeks out other enemies to bond with",
+          "attack": {
+            "contact_damage": 0.5,
+            "bonding": "Strengthens nearby enemies (multiplier on their damage)",
+            "priority_target": "Kill symbiote first or it buffs others"
+          },
+          "health": 8,
+          "spawn_rate": "Uncommon",
+          "strategy": "Tactical priority: eliminate symbiote before it bonds.",
+          "twist": "Creates team dynamics. Must manage threat prioritization."
+        },
+        {
+          "id": "consciousness_node",
+          "name": "Consciousness Node",
+          "icon": "🧠",
+          "description": "Stationary anchor that controls all enemies",
+          "type": "Commander",
+          "behavior": "Anchor point that coordinates all enemies",
+          "attack": {
+            "direct_damage": 0,
+            "command_effect": "Coordinates other enemies, boost their behavior",
+            "command_range": "Whole arena"
+          },
+          "health": 16,
+          "spawn_rate": "Uncommon",
+          "strategy": "Destroy consciousness node to disable enemy coordination.",
+          "twist": "Destroying it dramatically changes room difficulty."
+        },
+        {
+          "id": "apex",
+          "name": "Apex",
+          "icon": "👑",
+          "description": "Combines best traits of all previous enemies",
+          "type": "Master Enemy",
+          "behavior": "Uses attacks from ALL previous enemy types",
+          "attack": {
+            "pattern_rotation": "Cycles through all floor enemy patterns",
+            "contact_damage": 1.4,
+            "adaptation": "Learns what works against you"
+          },
+          "health": 18,
+          "spawn_rate": "Rare",
+          "difficulty": "Extreme (final exam)",
+          "strategy": "Must know all enemy patterns. Test of mastery.",
+          "twist": "Defeating it feels like understanding the whole system."
+        },
+        {
+          "id": "reality_rift",
+          "name": "Reality Rift",
+          "icon": "🌌",
+          "description": "Tears in reality creating chaos",
+          "type": "Dimensional",
+          "behavior": "Opens rifts that teleport player/enemies",
+          "attack": {
+            "teleportation": "Random positioning",
+            "contact_damage": 2,
+            "unpredictability": "Chaos embodied"
+          },
+          "health": 12,
+          "spawn_rate": "Uncommon",
+          "difficulty": "Chaotic",
+          "strategy": "Adapt to randomness. No prediction possible.",
+          "twist": "Can create advantageous teleports (good RNG wins runs)."
+        },
+        {
+          "id": "void_entity",
+          "name": "Void Entity",
+          "icon": "⚫",
+          "description": "Being from outside reality",
+          "type": "Incomprehensible",
+          "behavior": "Moves in impossible ways",
+          "attack": {
+            "reality_damage": "Ignores normal physics",
+            "contact_damage": 3,
+            "debuff": "Confusion (erratic player movement)"
+          },
+          "health": 19,
+          "spawn_rate": "Rare",
+          "difficulty": "Extreme",
+          "strategy": "Requires intuition more than skill.",
+          "twist": "Last boss-tier regular enemy. Feels otherworldly."
+        }
+      ],
+      
+      "boss": {
+        "id": "the_infinitum",
+        "name": "The Infinitum",
+        "subtitle": "All Systems Combined",
+        "icon": "♾️",
+        "narrative": "All knowledge, all life, all systems at once. Source of everything. The origin understanding.",
+        "appearance": "Shifts between all previous boss visual styles. Reality unstable around it. Beautiful and terrifying.",
+        
+        "behavior": "Shifts between all previous boss forms. Uses attacks from all previous bosses. Adapts to your playstyle.",
+        "attack_patterns": {
+          "phase_1_entropy": {
+            "health_range": "240-161 HP",
+            "pattern": "Uses Entropy (vortex) attacks",
+            "style": "Disorder and chaos"
+          },
+          "phase_2_tectonic": {
+            "health_range": "160-81 HP",
+            "pattern": "Uses Tectonic Titan (charge, earthquakes) attacks",
+            "style": "Immovable force"
+          },
+          "phase_3_infinitum": {
+            "health_range": "80-1 HP",
+            "pattern": "Combines ALL previous bosses attacks",
+            "adaptation": "Learns what attacks work against you",
+            "final_form": "True form emerges as you destroy it"
+          }
+        },
+        
+        "health": 240,
+        "phases": 3,
+        "scaling": "6x Entropy (but spread across 3 phases)",
+        "difficulty": "Extreme (final boss)",
+        "time_to_beat": "180-240 seconds with mastery",
+        
+        "strategy": {
+          "phase_1": "Use Entropy knowledge (pattern learning)",
+          "phase_2": "Use Tectonic knowledge (positioning)",
+          "phase_3": "Combine everything. Mastery test."
+        },
+        
+        "victory_feel": "Complete understanding. All systems understood. Transcendence.",
+        "post_victory_narrative": "You understand. You return to the Lab, but changed. Ready to begin again with new knowledge."
+      },
+
+      "hazards": [
+        {
+          "type": "reality_instability",
+          "description": "Random teleports, terrain shifts",
+          "damage": 1.0,
+          "mechanic": "Unpredictable environmental chaos"
+        },
+        {
+          "type": "all_previous_hazards",
+          "description": "Every hazard from all floors happening simultaneously",
+          "damage": "Varies",
+          "mechanic": "Pure chaos, must adapt constantly"
+        },
+        {
+          "type": "symbiotic_bonds",
+          "description": "Enemies link together, sharing damage/effects",
+          "damage": "Shared",
+          "mechanic": "Tactical complexity layer"
+        },
+        {
+          "type": "living_obstacles",
+          "description": "Creatures block paths, organic maze",
+          "damage": 0.5,
+          "mechanic": "Environmental navigation puzzle"
+        }
+      ],
+      
+      "hazard_philosophy": "EVERYTHING AT ONCE. Final test of complete mastery.",
+      "difficulty_tier": 5
+    }
+  },
+
+  "enemy_architecture": {
+    "template": {
+      "id": "unique_id",
+      "name": "Name",
+      "icon": "emoji",
+      "description": "One-liner",
+      "type": "Enemy Type Category",
+      "behavior": "How it moves/acts",
+      "attack": {
+        "primary": "Main attack",
+        "secondary": "Secondary effect",
+        "frequency": "How often"
+      },
+      "health": "Hits to kill",
+      "spawn_rate": "Common/Uncommon/Rare",
+      "strategy": "How to fight",
+      "twist": "Unique mechanic"
+    },
+    
+    "scaling_rules": [
+      "Each floor has 6 unique enemies + 1 boss",
+      "Boss health scales: Entropy (40) → Tectonic (80) → Nucleus (120) → Furnace (160) → Infinitum (240)",
+      "Infinitum is 6x Entropy but spread across 3 phases",
+      "Each floor can have post-MVP boss variants (same health, different patterns)",
+      "Enemy health pools scale with player progression (artifacts, specializations, health)"
+    ]
+  },
+
+  "narrative_progression": {
+    "start": "You wake up in The Lab (modern day). Ready to descend.",
+    "floor_1_to_2": "Entropy breaks the lab. You descend deeper to escape...",
+    "floor_2_to_3": "Tectonic forces push you down. You break through into water...",
+    "floor_3_to_4": "The Nucleus pulses. You rise upward through the layers...",
+    "floor_4_to_5": "The Stellar Furnace burns. You emerge into the Biosphere...",
+    "floor_5_boss": "The Infinitum. All systems at once. The source of everything.",
+    "victory": "You understand. You return to the Lab, but changed. Ready to begin again."
+  },
+
+  "ui_storytelling": {
+    "floor_entry_format": "[FLOOR_NAME] - [ERA_DESCRIPTION]",
+    "examples": [
+      "THE INFINITE LAB - Modern Day",
+      "THE ROCKY DEPTHS - 3.8 Billion Years Ago",
+      "THE FLOODED DEPTHS - 2.4 Billion Years Ago",
+      "THE TEMPEST - 540 Million Years Ago",
+      "THE ORIGIN - Present Day (and Beyond)"
+    ],
+    "enemy_descriptions": "Hint at evolution and system role",
+    "specialization_unlocks": "Unlock with narrative context (Paleontology after Tectonic Titan)"
+  },
+
+  "combat_design_philosophy": {
+    "twin_stick_friendly": "Kiting, positioning, pattern learning are core",
+    "emergent_interactions": "Enemies affecting each other creates dynamic rooms",
+    "learning_curve": "Floor 1 is learnable, each floor increases complexity",
+    "fractal_enemies": "One signature enemy per floor creates replayability through mastery",
+    "boss_as_test": "Each boss tests mastery of that floor's lessons"
+  }
+}
+
+
+===== FILE: docs/floors.json =====
+{
+  "floors": [
+    {
+      "floor": 1,
+      "biome": "lab",
+      "biome_name": "The Infinite Lab",
+      "difficulty_tier": 1,
+      "theme": "Basic cellular biology, chemistry, physics fundamentals",
+      
+      "guaranteed_rooms": {
+        "normal_rooms": 6,
+        "secret_rooms": 1,
+        "shop_room": 1,
+        "boss_room": 1,
+        "marked_unlocked_door": 1,
+        "total_guaranteed": 10
+      },
+
+      "procedural_room": {
+        "count": 1,
+        "type": "shop_or_mystery_door",
+        "probability": {
+          "shop_locked_door": 0.75,
+          "mystery_door": 0.25
+        }
+      },
+
+      "total_rooms": 11,
+      "scaling_note": "Shortest floor. Introduction. Quick learning curve.",
+
+      "locked_doors": {
+        "shop_locked_door": {
+          "count": 1,
+          "guaranteed": true,
+          "behind_key": true,
+          "visuals": "Shop theme (counter, shelves)",
+          "inside": "Safe shop room, buy items",
+          "enemy_count": 0
+        },
+        "mystery_door": {
+          "count": "0 or 1 (25% procedural)",
+          "behind_key": true,
+          "visuals": "Looks identical to shop (player confusion)",
+          "inside": "Hard enemies + rare chest (unlocked)",
+          "enemy_count": "3-5 harder enemies",
+          "difficulty": "High for floor"
+        }
+      },
+
+      "unlocked_doors": {
+        "marked_door": {
+          "count": 1,
+          "guaranteed": true,
+          "locked": false,
+          "visuals": "Visibly different from shop (distinctive marking)",
+          "inside": "Safe room, rare chest (unlocked)",
+          "contents": "Artifact, class unlock, or rare loot",
+          "enemy_count": 0
+        }
+      },
+
+      "key_economy": {
+        "expected_keys": "0-2 (average 1)",
+        "guaranteed_key": "Somewhere on floor in rare drop",
+        "tension": "Will I have enough to open both locked doors?"
+      },
+
+      "barriers": {
+        "fire": 2,
+        "sealed": 1,
+        "gaps": 1,
+        "total": 4
+      },
+
+      "consumable_availability": {
+        "match_drop_rate": 0.08,
+        "rope_drop_rate": 0.07,
+        "blowtorch_drop_rate": 0.01,
+        "breaker_bar_drop_rate": 0.00
+      },
+
+      "design_intent": "Introduction. Low tension. Learn mechanics. Discover that locked doors = shop or mystery.",
+      
+      "unlocks_after_boss": ["Microbiology", "Neuroscience"]
+    },
+
+    {
+      "floor": 2,
+      "biome": "geosphere",
+      "biome_name": "The Rocky Depths",
+      "difficulty_tier": 2,
+      "theme": "Geological formations, mineral structures, seismic activity",
+      
+      "guaranteed_rooms": {
+        "normal_rooms": 8,
+        "secret_rooms": 1,
+        "shop_room": 1,
+        "boss_room": 1,
+        "marked_unlocked_door": 1,
+        "total_guaranteed": 12
+      },
+
+      "procedural_room": {
+        "count": 1,
+        "type": "shop_or_mystery_door"
+      },
+
+      "total_rooms": 13,
+      "scaling_note": "Standard floor. Mid-game learning phase.",
+
+      "locked_doors": {
+        "shop_locked_door": {
+          "count": 1,
+          "guaranteed": true,
+          "behind_key": true
+        },
+        "mystery_door": {
+          "count": "0 or 1 (25%)",
+          "behind_key": true
+        }
+      },
+
+      "key_economy": {
+        "expected_keys": "0-2 (average 1)",
+        "tension": "Moderate - 75% safe, 25% risky"
+      },
+
+      "barriers": {
+        "rock": 3,
+        "sealed": 2,
+        "gaps": 1,
+        "total": 6
+      },
+
+      "consumable_availability": {
+        "match_drop_rate": 0.06,
+        "rope_drop_rate": 0.08,
+        "blowtorch_drop_rate": 0.02,
+        "breaker_bar_drop_rate": 0.02
+      },
+
+      "design_intent": "Standard difficulty. Player now knows locked doors = shop or mystery. Resource scarcity begins.",
+      
+      "unlocks_after_boss": ["Marine Science", "Ecology", "Hydrology"]
+    },
+
+    {
+      "floor": 3,
+      "biome": "hydrosphere",
+      "biome_name": "The Flooded Depths",
+      "difficulty_tier": 3,
+      "theme": "Water ecosystems, ice formations, aquatic life",
+      
+      "guaranteed_rooms": {
+        "normal_rooms": 9,
+        "secret_rooms": 1,
+        "shop_room": 1,
+        "boss_room": 1,
+        "marked_unlocked_door": 1,
+        "total_guaranteed": 13
+      },
+
+      "procedural_room": {
+        "count": 1,
+        "type": "shop_or_mystery_door"
+      },
+
+      "total_rooms": 14,
+      "scaling_note": "Scaling up. Mid-game tension increases.",
+
+      "locked_doors": {
+        "shop_locked_door": {
+          "count": 1,
+          "guaranteed": true,
+          "behind_key": true
+        },
+        "mystery_door": {
+          "count": "0 or 1 (25%)"
+        }
+      },
+
+      "key_economy": {
+        "expected_keys": "0-2 (average 1)",
+        "tension": "High - Not enough keys for all doors + mystery creates risk"
+      },
+
+      "barriers": {
+        "ice": 3,
+        "water": 2,
+        "gaps": 2,
+        "total": 7
+      },
+
+      "consumable_availability": {
+        "match_drop_rate": 0.04,
+        "rope_drop_rate": 0.10,
+        "blowtorch_drop_rate": 0.08,
+        "breaker_bar_drop_rate": 0.01
+      },
+
+      "design_intent": "Medium-hard. Resource scarcity + uncertainty. First 3-tier combos possible.",
+      
+      "unlocks_after_boss": ["Paleontology", "Volcanology", "Ornithology"]
+    },
+
+    {
+      "floor": 4,
+      "biome": "atmosphere",
+      "biome_name": "The Tempest",
+      "difficulty_tier": 4,
+      "theme": "Weather systems, atmospheric phenomena, extreme conditions",
+      
+      "guaranteed_rooms": {
+        "normal_rooms": 8,
+        "secret_rooms": 2,
+        "shop_room": 1,
+        "boss_room": 1,
+        "marked_unlocked_door": 1,
+        "total_guaranteed": 13
+      },
+
+      "procedural_room": {
+        "count": 1,
+        "type": "shop_or_mystery_door"
+      },
+
+      "total_rooms": 14,
+      "scaling_note": "Late game intensity. Double secret rooms unlock treasure paths.",
+
+      "locked_doors": {
+        "shop_locked_door": {
+          "count": 1,
+          "guaranteed": true
+        },
+        "mystery_door": {
+          "count": "0 or 1 (25%)"
+        }
+      },
+
+      "key_economy": {
+        "expected_keys": "0-2 (average 1)",
+        "tension": "Very high - Scarcity meets uncertainty"
+      },
+
+      "barriers": {
+        "wind": 2,
+        "storm": 2,
+        "ice": 1,
+        "fire": 1,
+        "total": 6
+      },
+
+      "consumable_availability": {
+        "match_drop_rate": 0.05,
+        "rope_drop_rate": 0.06,
+        "blowtorch_drop_rate": 0.05,
+        "breaker_bar_drop_rate": 0.03
+      },
+
+      "design_intent": "Hard. Risk/reward decisions critical. Most combinations available. Double secrets reward exploration.",
+      
+      "unlocks_after_boss": ["Mycology", "Entomology", "Genetics", "Immunology", "Seismology", "Meteorology"]
+    },
+
+    {
+      "floor": 5,
+      "biome": "biosphere",
+      "biome_name": "The Origin",
+      "difficulty_tier": 5,
+      "theme": "Life's origin, primordial forces, ultimate knowledge",
+      
+      "guaranteed_rooms": {
+        "normal_rooms": 7,
+        "secret_rooms": 2,
+        "shop_room": 1,
+        "boss_room": 1,
+        "marked_unlocked_door": 1,
+        "total_guaranteed": 12
+      },
+
+      "procedural_room": {
+        "count": 1,
+        "type": "shop_or_mystery_door"
+      },
+
+      "total_rooms": 13,
+      "scaling_note": "Final floor. Longest but fewer normal rooms (more focused). Double secrets reward final exploration.",
+
+      "locked_doors": {
+        "shop_locked_door": {
+          "count": 1,
+          "guaranteed": true
+        },
+        "mystery_door": {
+          "count": "0 or 1 (25%)"
+        }
+      },
+
+      "key_economy": {
+        "expected_keys": "0-2 (average 1)",
+        "tension": "Extreme - Every choice matters"
+      },
+
+      "barriers": {
+        "cosmic": 2,
+        "primordial": 2,
+        "mixed": 2,
+        "total": 6
+      },
+
+      "final_boss": {
+        "name": "The Infinitum",
+        "description": "Ultimate boss fight",
+        "health": "240 HP (3 phases)",
+        "difficulty": "Extreme"
+      },
+
+      "consumable_availability": {
+        "match_drop_rate": 0.06,
+        "rope_drop_rate": 0.08,
+        "blowtorch_drop_rate": 0.06,
+        "breaker_bar_drop_rate": 0.04
+      },
+
+      "design_intent": "Extreme gauntlet. Final test of mastery. Double secrets for final treasure hunt before endgame.",
+      
+      "unlocks_after_boss": ["Oceanography", "Toxicology", "Archaeology", "Quantum Physics", "Cosmology", "Mineralogy", "Virology", "Exobiology", "Climatology", "Astronomy", "Wildlife"]
+    }
+  ],
+
+  "floor_summary": {
+    "structure": "Scaled room counts: 11 → 13 → 14 → 14 → 13",
+    "total_rooms_per_run": "65 rooms maximum",
+    "room_distribution_scaling": {
+      "floor_1": "6 normal + 1 secret + 1 shop + 1 boss + 1 marked door + 1 procedural = 11 total",
+      "floor_2": "8 normal + 1 secret + 1 shop + 1 boss + 1 marked door + 1 procedural = 13 total",
+      "floor_3": "9 normal + 1 secret + 1 shop + 1 boss + 1 marked door + 1 procedural = 14 total",
+      "floor_4": "8 normal + 2 secrets + 1 shop + 1 boss + 1 marked door + 1 procedural = 14 total (DOUBLE SECRETS)",
+      "floor_5": "7 normal + 2 secrets + 1 shop + 1 boss + 1 marked door + 1 procedural = 13 total (DOUBLE SECRETS)"
+    },
+    "progression": "Each floor unlocks new specializations after boss",
+    "difficulty_curve": "Steady increase from easy to extreme",
+    "secret_rooms": "Late-game reward. Floors 4-5 have 2 secrets each for better treasure access.",
+    "key_tension": "1-2 keys per floor, must choose which locked doors to open",
+    "discovery_pacing": "New specializations unlock as you progress, enabling new combos"
+  }
+}
+
+
+===== FILE: docs/game_loop.json =====
+{
+  "game_loop": {
+    "philosophy": "Single run = scaled floors (11→13→14→14→13 rooms) = 65 rooms maximum. Death = game over. Meta-progression through discoveries.",
+    
+    "run_structure": {
+      "total_rooms_per_run": 65,
+      "formula": "11 + 13 + 14 + 14 + 13 rooms",
+      "death_condition": "Reach 0 brains (health) = game over",
+      "victory_condition": "Defeat The Infinitum boss on Floor 5"
+    },
+
+    "single_run_loop": {
+      "phase_1_entry": {
+        "name": "Run Start",
+        "action": "Player enters The Lab (Floor 1)",
+        "starting_state": {
+          "health": "5 brains",
+          "damage": "1.0",
+          "speed": "1.0",
+          "specialization": "Student (default)",
+          "weapon_artifacts": "0/2 slots",
+          "consumable_artifacts": "None"
+        }
+      },
+
+      "phase_2_exploration": {
+        "name": "Room Exploration",
+        "repeats": "Once per room",
+        "room_types": [
+          "Normal Combat Room (enemies)",
+          "Secret Room (rare loot)",
+          "Shop Room (vending machine)",
+          "Boss Room (end-of-floor boss)",
+          "Marked Door (unlocked, rare chest)",
+          "Locked Door (shop or mystery - requires key)"
+        ],
+        "actions_in_room": [
+          "Combat (kill enemies to progress)",
+          "Navigate (use permanent tools: Match, Rope, Blowtorch, Breaker Bar)",
+          "Collect (loot: coins, items, specialization books, artifacts)",
+          "Shop (vending machine - buy items with coins)",
+          "Choose (if multiple items, pick what to take)"
+        ]
+      },
+
+      "phase_3_combat": {
+        "name": "Twin-Stick Combat",
+        "mechanics": [
+          "Move with left stick (avoid enemies/hazards)",
+          "Shoot with right stick (attack enemies)",
+          "Collect drops (automatic pickup or manual proximity)",
+          "Dodge/kite (positioning-based skill)",
+          "Manage resources (coins, health, ammunition/cooldowns)"
+        ],
+        "combat_rewards": {
+          "enemy_kill": {
+            "coins": "1-2 per normal enemy",
+            "specialization_book": "5-10% drop rate",
+            "artifact": "Rare (~1% per enemy)",
+            "consumable_artifact": "15% drop rate (Burrito, Energy Drink, etc.)"
+          }
+        }
+      },
+
+      "phase_4_progression": {
+        "name": "Room Clear → Next Room",
+        "flow": [
+          "Kill all enemies in room",
+          "Collect all loot",
+          "Door to next room unlocks",
+          "Enter next room or backtrack (shop, secret, boss)"
+        ]
+      },
+
+      "phase_5_floor_boss": {
+        "name": "Boss Encounter",
+        "trigger": "Reach boss room (guaranteed)",
+        "boss_fight": {
+          "unique_patterns": "Each boss has specific attack patterns",
+          "difficulty": "Scales with player stats (artifacts, health)",
+          "health": "Floor 1: 40 HP → Floor 5: 240 HP (3 phases)"
+        },
+        "victory": "Boss defeated → Floor unlocked",
+        "defeat": "Lose all brains → Game Over (run ends)"
+      },
+
+      "phase_6_floor_transition": {
+        "name": "Descend to Next Floor",
+        "on_victory": "Floor boss defeated",
+        "transition": {
+          "UI": "Narrative message (e.g., 'Tectonic forces push you down...')",
+          "state_transfer": "All stats/items carry over to next floor",
+          "new_enemies": "Floor 2 enemies now spawn",
+          "new_hazards": "Floor 2 hazards now active",
+          "new_shops": "New vending machine with Floor 2 pricing"
+        }
+      },
+
+      "phase_7_meta_progression": {
+        "name": "Between Rooms",
+        "when": "After each room clear",
+        "permanent_effects": {
+          "specialization_book_collected": "Added to codex permanently. Unlocks new combo.",
+          "artifact_discovered": "Added to loot pool for all future runs.",
+          "boss_defeated": "Unlocks next floor for future runs."
+        }
+      },
+
+      "phase_8_endgame": {
+        "name": "Final Boss / Victory",
+        "trigger": "Reach Floor 5 boss (The Infinitum)",
+        "challenge": {
+          "health": "240 HP across 3 phases",
+          "patterns": "Uses attacks from all previous bosses + adapts",
+          "difficulty": "Extreme - requires mastery of all floor mechanics"
+        },
+        "victory": {
+          "ending": "Narrative: 'You understand. You return to the Lab, but changed.'",
+          "stats_recorded": "Run completion time, total brains used, coins collected",
+          "meta_reward": "All discovered items/specs permanently unlocked"
+        },
+        "defeat": "Game Over. Return to main menu."
+      }
+    },
+
+    "meta_progression": {
+      "philosophy": "Discovery system. What you find once, unlocks forever.",
+      
+      "discovery_types": [
+        {
+          "type": "Specialization Book",
+          "discovery": "Find a 'Biology' book during a run",
+          "unlock": "Biology is now available from start of ALL future runs",
+          "effect": "Can start as Biologist if desired, or combine with other specs",
+          "progression": "Collect all 34 specializations over multiple runs"
+        },
+        {
+          "type": "Weapon Artifact",
+          "discovery": "Find 'Battery' during a run",
+          "unlock": "Battery now appears in loot pools for all future runs",
+          "effect": "Can equip Battery in any future run",
+          "progression": "Collect all 5 base artifacts + 5+ combination artifacts"
+        },
+        {
+          "type": "Artifact Combination",
+          "discovery": "Equip Battery + Microscope together → creates Electron Microscope",
+          "unlock": "Electron Microscope now available as base drop for all future runs",
+          "effect": "Players who discover combo get it earlier than others",
+          "progression": "Unlock 50+ combinations across runs"
+        },
+        {
+          "type": "Boss Victory",
+          "discovery": "Defeat Entropy boss on Floor 1",
+          "unlock": "Floor 2 is now accessible in all future runs",
+          "effect": "Can proceed deeper, discover more",
+          "progression": "Unlock all 5 bosses, reach The Infinitum"
+        }
+      ],
+
+      "codex_system": {
+        "what_it_tracks": [
+          "All specializations discovered (with unlock conditions)",
+          "All weapon artifacts discovered",
+          "All artifact combinations discovered",
+          "All bosses defeated",
+          "Best run stats (fastest time, most brains remaining, most coins)"
+        ],
+        "visual": "Menu showing all discoveries with 'locked' vs 'unlocked' status",
+        "incentive": "Completionists want to find all 34 specs + all artifact combos"
+      },
+
+      "knowledge_reward": {
+        "philosophy": "Player knowledge is power",
+        "example": {
+          "first_run": "Random artifacts, random specializations. 'What does Battery do?'",
+          "tenth_run": "Player knows Battery = damage. Seeks out Battery + Microscope combo.",
+          "thirtieth_run": "Player has discovered 20 artifact combos. Builds intentionally broken runs."
+        }
+      }
+    },
+
+    "run_difficulty_scaling": {
+      "player_power_progression": {
+        "start_of_run": "1.0 damage, 1.0 speed, 5 health",
+        "mid_run": "1.3 damage (artifacts), 1.15 speed, 7 health (specializations + consumables)",
+        "late_run": "1.5+ damage, 1.3 speed, 10+ health (full optimization)"
+      },
+
+      "enemy_difficulty": {
+        "philosophy": "Enemies scale with floor, not player power",
+        "floor_1": "Weak enemies, learnable patterns",
+        "floor_5": "Extreme enemies, requires mastery + good artifacts",
+        "scaling": "Difficulty is FLOOR-based, not player-based"
+      },
+
+      "difficulty_variance": {
+        "lucky_run": "Find 3 early artifacts, 2 specialization books → trivialize Floor 3",
+        "unlucky_run": "Find no artifacts, no books → struggle even on Floor 1",
+        "skill_matters": "Good player can beat Floors 1-2 with no artifacts. Bad player struggles with any floor."
+      }
+    },
+
+    "loot_economy": {
+      "drop_rates_per_enemy": {
+        "specialization_book": "5-10% per normal enemy (increasing per floor)",
+        "weapon_artifact": "Very rare (~1% per enemy) unless you have 3+ collected",
+        "consumable_artifact": "15% per enemy (Burrito, Energy Drink, etc.)",
+        "coins": "1-2 per normal enemy"
+      },
+
+      "environmental_breaks": {
+        "match_use": "Reveals coins/items hidden in cracked walls",
+        "rope_use": "Allows access to high/low areas",
+        "blowtorch_use": "Breaks ice/sealed doors",
+        "breaker_bar_use": "Breaks thick barriers"
+      },
+
+      "chest_contents": {
+        "normal_chest": "10-20 coins, maybe item",
+        "rare_chest": "30-50 coins, guaranteed item (artifact or book)",
+        "secret_room_chest": "50-100 coins, rare artifact or rare book"
+      }
+    },
+
+    "key_decision_points": {
+      "decision_1_shop_priority": {
+        "scenario": "At vending machine with 60 coins. Choose 1 of 3 items:",
+        "option_a": "Buy artifact (100 coins) - can't afford, skip",
+        "option_b": "Buy Blowtorch (60 coins) - access secret areas",
+        "option_c": "Buy Healing (40 coins) - save for next shop"
+      },
+
+      "decision_2_locked_door": {
+        "scenario": "Found 1 key. 2 locked doors ahead: shop or mystery?",
+        "option_a": "Open shop - safe, guaranteed good loot",
+        "option_b": "Open mystery - risky, but maybe rare artifact",
+        "option_c": "Save key - might find another, or skip both"
+      },
+
+      "decision_3_artifact_swap": {
+        "scenario": "Have Battery (1.2 damage). Find Microscope (1.25 speed) + Lens (1.15 damage).",
+        "option_a": "Keep Battery, equip Microscope (fast, still powerful)",
+        "option_b": "Swap Battery for Lens (more focused damage)",
+        "option_c": "Equip both (1/2 is Microscope, 1/2 is Lens - hybrid build)"
+      },
+
+      "decision_4_health_management": {
+        "scenario": "Have 3 brains left. Healing costs 40 coins. Enemy drops Burrito (+2 health).",
+        "option_a": "Use Burrito immediately - guaranteed health",
+        "option_b": "Save Burrito for later? (risky if you die)",
+        "option_c": "Spend coins on healing at shop - save Burrito"
+      }
+    },
+
+    "run_variance": {
+      "what_changes_each_run": [
+        "Enemy spawn locations (procedural room generation)",
+        "Loot drops (randomized but seeded)",
+        "Specialization book appearances (random floors)",
+        "Artifact discoveries (RNG when they drop)",
+        "Boss AI patterns (adaptive, learns your moves)",
+        "Locked door content (shop vs mystery, random per run)"
+      ],
+
+      "what_stays_consistent": [
+        "Floor layouts (scaled per floor: 11→13→14→14→13)",
+        "Floor progression (always 1→2→3→4→5)",
+        "Boss health pools (same per floor across runs)",
+        "Artifact stat values (Battery always 1.2 damage)",
+        "Specialization effects (Biology always has same debuff)"
+      ],
+
+      "replayability": {
+        "reason_1": "Different loot = different build = different playstyle",
+        "reason_2": "New discoveries unlock new synergies",
+        "reason_3": "Boss learning = must adapt strategy",
+        "reason_4": "Player skill matters = same run can go very differently"
+      }
+    },
+
+    "progression_loops": {
+      "loop_1_single_run": {
+        "duration": "30-90 minutes per run (depending on skill + luck)",
+        "goal": "Reach Floor 5 boss or die trying",
+        "reward": "Discoveries (unlocks for future runs)"
+      },
+
+      "loop_2_meta_progression": {
+        "duration": "5-50 runs to unlock everything",
+        "goal": "Discover all 34 specializations + 20+ artifact combos",
+        "reward": "Full codex. Knowledge. Ability to build crazy combos."
+      },
+
+      "loop_3_mastery": {
+        "duration": "Unlimited (speedruns, challenge runs, self-imposed rules)",
+        "goal": "Beat game with specific builds, fast times, etc.",
+        "reward": "Personal satisfaction. Leaderboards (future)."
+      }
+    },
+
+    "run_failure_states": {
+      "game_over_condition": "Reach 0 brains (health)",
+      "recovery_mechanics": "None in MVP - death is permanent per run",
+      "upon_death": {
+        "stats_saved": "Run duration, floors cleared, items collected",
+        "return_to": "Main menu",
+        "next_run": "New run with same baseline stats (discovered items still unlocked)",
+        "emotional_impact": "Defeat stings, motivates next run"
+      },
+
+      "post_launch_features": "Resurrection items, continue mechanics could be added later"
+    },
+
+    "time_to_completion": {
+      "first_run": "45-90 minutes (learning, exploring, dying)",
+      "experienced_run": "30-45 minutes (know patterns, efficient routing)",
+      "speedrun_potential": "15-20 minutes (with mastery + good RNG)",
+      "100_percent": "50-100 hours (unlock all specs, combos, beat all bosses multiple times)"
+    },
+
+    "session_structure": {
+      "short_session": "1-2 runs (45-90 minutes total)",
+      "medium_session": "3-5 runs (2-4 hours total)",
+      "long_session": "Unlimited runs, grinding for specific discoveries",
+      "ideal_for": "Lunch break (1 run), evening chill (3 runs), weekend binge (many runs)"
+    },
+
+    "win_conditions": {
+      "immediate_win": "Defeat The Infinitum, reach end credits",
+      "meta_win": "Discover all 34 specializations",
+      "full_win": "Unlock all artifact combinations (20+)",
+      "ultimate_win": "Complete codex + beat all bosses + speedrun times"
+    },
+
+    "next_run_loop": {
+      "between_runs": {
+        "main_menu": "See codex (all discoveries), start new run",
+        "choices_available": [
+          "Start default run (randomized)",
+          "Select specific starting specialization (if discovered)",
+          "View run statistics (best times, furthest floors)",
+          "View codex (all unlocked items)"
+        ]
+      },
+
+      "new_run_begins": {
+        "state_reset": "Health back to 5, speed/damage back to 1.0",
+        "state_carries": "All discovered specializations/artifacts still in loot pools",
+        "philosophy": "Each run is a fresh start, but knowledge persists"
+      }
+    }
+  },
+
+  "progression_milestones": {
+    "milestone_1_first_boss": {
+      "trigger": "Defeat Entropy boss (Floor 1)",
+      "reward": "Floor 2 unlocked permanently",
+      "discovery": "Player learns boss patterns exist",
+      "incentive": "New floor = new enemies, new loot"
+    },
+
+    "milestone_2_first_combo": {
+      "trigger": "Discover Battery + Microscope = Electron Microscope",
+      "reward": "Electron Microscope added to loot pool",
+      "discovery": "Player learns artifacts can combine",
+      "incentive": "Combos are more powerful, unlock more combos"
+    },
+
+    "milestone_3_first_specialization": {
+      "trigger": "Collect any specialization book (Biology, Chemistry, etc.)",
+      "reward": "+1 max health, specialization now available",
+      "discovery": "Player learns specs unlock new projectiles",
+      "incentive": "Different specs = different playstyles"
+    },
+
+    "milestone_4_broken_build": {
+      "trigger": "Find artifact + specialization combo that trivializes a floor",
+      "reward": "Player experiences 'broken' run feeling",
+      "discovery": "Synergies exist, some are overpowered",
+      "incentive": "Want to find more broken combos"
+    },
+
+    "milestone_5_full_codex": {
+      "trigger": "Unlock all 34 specializations + all artifact combinations",
+      "reward": "Complete knowledge, can build anything",
+      "discovery": "Full picture of what's possible",
+      "incentive": "Leaderboard, speedruns, challenge runs"
+    }
+  },
+
+  "session_examples": {
+    "example_1_lucky_first_run": {
+      "duration": "35 minutes",
+      "path": "Floor 1 → Floor 2 → Floor 3 (boss, die)",
+      "loot": [
+        "Battery artifact (Floor 1)",
+        "Microscope artifact (Floor 2)",
+        "Biology book (Floor 2)",
+        "Chemistry book (Floor 3)",
+        "3 Burritos (various)"
+      ],
+      "final_stats": "1.35 damage, 1.25 speed, 9 brains",
+      "discoveries": ["Battery", "Microscope", "Electron Microscope", "Biology", "Chemistry", "Biochemist"],
+      "next_run_impact": "All these items now in loot pool"
+    },
+
+    "example_2_unlucky_first_run": {
+      "duration": "22 minutes",
+      "path": "Floor 1 → death at room 8",
+      "loot": [
+        "2 Burritos",
+        "No artifacts found",
+        "No books found"
+      ],
+      "final_stats": "1.0 damage, 1.0 speed, 1 brain",
+      "discoveries": "None",
+      "cause_of_death": "Rushed, didn't understand combat patterns",
+      "next_run_impact": "Player learned: go slow, learn patterns, kite"
+    },
+
+    "example_3_mastery_run": {
+      "duration": "18 minutes",
+      "path": "Floor 1 → 2 → 3 → 4 → 5 (victory!)",
+      "loot": [
+        "Battery + Microscope + Electron Microscope (by Floor 2)",
+        "Physics book (early, intentional)",
+        "5 specialization books total",
+        "Quantum Microscope (legendary artifact)"
+      ],
+      "final_stats": "1.5 damage, 1.4 speed, 12 brains",
+      "discoveries": "10+ combinations, rare artifacts",
+      "strategy": "Knew where to find artifacts, built intentional combos",
+      "victory": "Beat The Infinitum, new personal best time"
+    }
+  }
+}
+
+
+===== FILE: docs/permanent_tools.json =====
+{
+  "permanent_tools_system": {
+    "description": "One-time discoveries. Limited uses (50-infinite). Game-changers. Replace consumable slots.",
+    "discovery_mechanic": {
+      "first_find": "Unlocks tool in loot pool permanently",
+      "subsequent_finds": "Can find again in future runs (rare)",
+      "inventory": "Replaces one consumable slot with tool",
+      "uses_display": "Shows remaining uses (e.g., 50/50)",
+      "philosophy": "Limited uses add tension and strategic decisions"
+    },
+
+    "total_tools": 5,
+    "rarity": "Legendary",
+    "drop_rate_first_discovery": 0.05,
+    "drop_rate_after_discovery": 0.08,
+
+    "tools": [
+      {
+        "id": "grappling_hook",
+        "name": "Grappling Hook",
+        "icon": "🪝",
+        "description": "Cross gaps and chasms",
+        "flavor": "No more bottomless pits.",
+        "ability": "Swing/grapple across any gap obstacle",
+        "replaces_slot": "Rope",
+        "max_uses": 50,
+        "mechanics": {
+          "primary_use": "Cross gaps",
+          "secondary_use": "Reach high ledges",
+          "tertiary_use": "Swing over hazardous ground",
+          "per_use_cost": 1
+        },
+        "tension_level": "Moderate",
+        "uses_per_floor": "~10 average",
+        "lasts_entire_run": true,
+        "advantages_over_consumable": [
+          "50 uses vs rope's 1-3 per find",
+          "Faster traverse",
+          "Reliable for entire run"
+        ]
+      },
+      {
+        "id": "fire_extinguisher",
+        "name": "Fire Extinguisher",
+        "icon": "🧯",
+        "description": "Extinguish fire hazards",
+        "flavor": "No more burning obstacles.",
+        "ability": "Safely traverse fire zones, extinguish flames",
+        "replaces_slot": "Match",
+        "max_uses": 40,
+        "mechanics": {
+          "primary_use": "Extinguish fire barriers",
+          "secondary_use": "Douse burning obstacles",
+          "tertiary_use": "Spray area to clear hazards",
+          "per_use_cost": 1
+        },
+        "tension_level": "Moderate",
+        "uses_per_floor": "~8 average",
+        "lasts_entire_run": true,
+        "advantages_over_consumable": [
+          "40 uses vs match's 1-3 per find",
+          "Faster activation",
+          "Reliable for entire run"
+        ]
+      },
+      {
+        "id": "magnifying_glass",
+        "name": "Magnifying Glass",
+        "icon": "🔍",
+        "description": "See secrets forever",
+        "flavor": "Nothing stays hidden.",
+        "ability": "Permanently reveal hidden passages and secrets",
+        "replaces_slot": "Breaker Bar",
+        "max_uses": "INFINITE",
+        "uses_never_deplete": true,
+        "mechanics": {
+          "primary_use": "Reveal hidden paths",
+          "secondary_use": "See through illusions",
+          "tertiary_use": "Highlight secret doors/chests",
+          "per_use_cost": 0
+        },
+        "tension_level": "None - pure advantage",
+        "uses_per_floor": "Unlimited",
+        "lasts_entire_run": "Always",
+        "advantages_over_consumable": [
+          "Infinite uses",
+          "Passive revelation",
+          "Reveals secrets without consuming resources",
+          "Game-changer for exploration"
+        ]
+      },
+      {
+        "id": "drill",
+        "name": "Drill",
+        "icon": "⚙️",
+        "description": "Break soft barriers",
+        "flavor": "Stone crumbles.",
+        "ability": "Bore through rock/mineral barriers effortlessly",
+        "replaces_slot": "Breaker Bar",
+        "max_uses": 50,
+        "mechanics": {
+          "primary_use": "Drill through rock barriers",
+          "secondary_use": "Smash mineral walls",
+          "tertiary_use": "Break sealed containers",
+          "per_use_cost": 1,
+          "speed": "Faster than breaker bar"
+        },
+        "tension_level": "Moderate",
+        "uses_per_floor": "~10 average",
+        "lasts_entire_run": true,
+        "advantages_over_consumable": [
+          "50 uses vs breaker bar's 1-2 per find",
+          "Faster drilling speed",
+          "More powerful strikes"
+        ]
+      },
+      {
+        "id": "plasma_cutter",
+        "name": "Plasma Cutter",
+        "icon": "⚡",
+        "description": "Melt through sealed structures",
+        "flavor": "Nothing is sealed anymore.",
+        "ability": "Cut through ice barriers and sealed doors instantly",
+        "replaces_slot": "Blowtorch",
+        "max_uses": 45,
+        "mechanics": {
+          "primary_use": "Melt ice barriers",
+          "secondary_use": "Cut sealed doors",
+          "tertiary_use": "Burn through tough materials",
+          "per_use_cost": 1,
+          "speed": "Instant or very fast"
+        },
+        "tension_level": "Moderate",
+        "uses_per_floor": "~9 average",
+        "lasts_entire_run": true,
+        "advantages_over_consumable": [
+          "45 uses vs blowtorch's 1-3 per find",
+          "Instant activation",
+          "Can cut through anything"
+        ]
+      }
+    ],
+
+    "player_strategy": {
+      "early_game": "Use tool freely, still have plenty",
+      "mid_game": "\"I'm at 30 uses left, should I use on this?\" - Strategic decisions begin",
+      "late_game": "\"I have 10 uses left for 2 more floors\" - Real tension",
+      "boss_fight": "\"Will X uses be enough?\" - Last-minute decisions",
+      "magnifying_glass_difference": "Never runs out. Pure advantage. Can explore anything. Makes secrets more accessible."
+    },
+
+    "balance_notes": {
+      "philosophy": "Powerful tools with finite lifespan create tension",
+      "uses_calculation": "Enough to feel powerful for entire run, but must be used wisely",
+      "discovery_value": "Finding permanent tool is valuable but not permanent",
+      "magnifying_glass_exception": "Infinite because discovery of secrets shouldn't be limited"
+    }
+  }
+}
+
+
+===== FILE: docs/shop_economy.json =====
+{
+  "shop_economy": {
+    "currency": {
+      "name": "Coins",
+      "philosophy": "Resource management like Binding of Isaac. Find coins, make tough choices about what to buy.",
+      "visual": "💰"
+    },
+
+    "coin_acquisition": {
+      "enemies": {
+        "normal_enemy": {
+          "coins_dropped": "1-2",
+          "average": 1.5,
+          "per_room_avg": "3-6 coins (2-4 normal enemies)"
+        },
+        "elite_enemy": {
+          "coins_dropped": "3-5",
+          "average": 4
+        },
+        "boss": {
+          "coins_dropped": "10-15",
+          "average": 12
+        }
+      },
+      "environmental_breaks": {
+        "blowtorch_use": "5-10 coins",
+        "breaker_bar_use": "5-10 coins",
+        "rope_use": "0 coins (utility, not reward)",
+        "match_use": "0 coins (utility, not reward)"
+      },
+      "chests": {
+        "normal_chest": "10-20 coins",
+        "rare_chest": "30-50 coins",
+        "secret_room_chest": "50-100 coins"
+      },
+      "average_per_room": {
+        "normal_room": "10-15 coins",
+        "rare_room": "20-30 coins",
+        "secret_room": "50-80 coins"
+      }
+    },
+
+    "room_structure": {
+      "vending_machine_room": {
+        "description": "Every floor has 1 vending machine room",
+        "layout": "Room with vending machine",
+        "selection": "Player chooses 1 of 3 random items to buy",
+        "mechanics": {
+          "one_purchase": "Can only buy one item per vending machine visit",
+          "multiple_machines": "Can't revisit same machine, but different rooms might have machines",
+          "refresh": "Items don't refresh - it's 1 choice per floor's machine"
+        }
+      }
+    },
+
+    "vending_machine_inventory": {
+      "pool_consumables": [
+        "Match (1-3 charges)",
+        "Rope (1-3 charges)",
+        "Blowtorch (1-3 charges)",
+        "Breaker Bar (1-2 charges)",
+        "Healing (restore 1 brain)"
+      ],
+      "pool_utility": [
+        "Universal Key"
+      ],
+      "pool_artifacts": [
+        "Any base artifact (Battery, Microscope, Lens, Prism, Light Source)",
+        "Any discovered combo artifact (Electron Microscope, etc.)"
+      ]
+    },
+
+    "prices_by_floor": {
+      "floor_1": {
+        "consumables": {
+          "match_3_charges": 25,
+          "rope_3_charges": 30,
+          "blowtorch_3_charges": 50,
+          "breaker_bar_2_charges": 40
+        },
+        "utility": {
+          "universal_key": 60
+        },
+        "healing": {
+          "restore_1_brain": 35
+        },
+        "artifacts": {
+          "base_artifact_common": 100,
+          "base_artifact_rare": 120,
+          "combo_artifact": 150
+        }
+      },
+
+      "floor_2": {
+        "consumables": {
+          "match_3_charges": 30,
+          "rope_3_charges": 35,
+          "blowtorch_3_charges": 60,
+          "breaker_bar_2_charges": 50
+        },
+        "utility": {
+          "universal_key": 75
+        },
+        "healing": {
+          "restore_1_brain": 40
+        },
+        "artifacts": {
+          "base_artifact_common": 120,
+          "base_artifact_rare": 140,
+          "combo_artifact": 180
+        }
+      },
+
+      "floor_3": {
+        "consumables": {
+          "match_3_charges": 35,
+          "rope_3_charges": 40,
+          "blowtorch_3_charges": 70,
+          "breaker_bar_2_charges": 60
+        },
+        "utility": {
+          "universal_key": 90
+        },
+        "healing": {
+          "restore_1_brain": 45
+        },
+        "artifacts": {
+          "base_artifact_common": 140,
+          "base_artifact_rare": 160,
+          "combo_artifact": 210
+        }
+      },
+
+      "floor_4": {
+        "consumables": {
+          "match_3_charges": 40,
+          "rope_3_charges": 45,
+          "blowtorch_3_charges": 80,
+          "breaker_bar_2_charges": 70
+        },
+        "utility": {
+          "universal_key": 105
+        },
+        "healing": {
+          "restore_1_brain": 50
+        },
+        "artifacts": {
+          "base_artifact_common": 160,
+          "base_artifact_rare": 180,
+          "combo_artifact": 240
+        }
+      },
+
+      "floor_5": {
+        "consumables": {
+          "match_3_charges": 45,
+          "rope_3_charges": 50,
+          "blowtorch_3_charges": 90,
+          "breaker_bar_2_charges": 80
+        },
+        "utility": {
+          "universal_key": 120
+        },
+        "healing": {
+          "restore_1_brain": 60
+        },
+        "artifacts": {
+          "base_artifact_common": 180,
+          "base_artifact_rare": 200,
+          "combo_artifact": 270
+        }
+      }
+    },
+
+    "economy_balance": {
+      "philosophy": "Artifacts are expensive. Require 2-3 floors of saving OR lucky environmental breaks.",
+      "math": {
+        "floor_1_average_room_coins": "10-15 coins",
+        "artifact_cost_floor_1": 100,
+        "rooms_needed": "7-10 rooms to afford 1 artifact",
+        "with_luck": "Secret room (50-80 coins) + 2 normal rooms = artifact affordable"
+      },
+      "tuning": {
+        "note": "All values are starting estimates. Easy to adjust if economy feels too tight/loose.",
+        "scaling": "Prices scale per floor, coin drops scale with difficulty",
+        "no_softlock": "Designed so players can't get stuck (always path to victory)"
+      }
+    },
+
+    "player_decision_trees": {
+      "scenario_1_early_run": {
+        "situation": "Floor 1, found 30 coins, at vending machine",
+        "choice_a": "Buy Healing (35 coins) - risky, no buffer",
+        "choice_b": "Buy Match (25 coins) - utility, save for next floor",
+        "choice_c": "Buy Key (60 coins) - can't afford, skip this machine"
+      },
+      "scenario_2_mid_run": {
+        "situation": "Floor 2, found 80 coins total, 60 remaining after spending",
+        "choice_a": "Buy Artifact (120 coins) - not enough, skip",
+        "choice_b": "Buy Blowtorch (60 coins) - saves money for next floor",
+        "choice_c": "Buy Healing + Match (70 coins) - get multiple tools"
+      },
+      "scenario_3_late_run": {
+        "situation": "Floor 4, found 250 coins, at vending machine with artifact available",
+        "choice_a": "Buy Artifact (240 coins) - spend almost everything for power",
+        "choice_b": "Buy Key + Healing (155 coins) - safe, diverse",
+        "choice_c": "Save for Floor 5 - risky, what if need healing?"
+      }
+    },
+
+    "tuning_parameters": {
+      "if_economy_too_tight": [
+        "Increase coins_per_enemy",
+        "Decrease artifact prices",
+        "Increase secret_room_coin_drops"
+      ],
+      "if_economy_too_loose": [
+        "Decrease coins_per_enemy",
+        "Increase artifact prices",
+        "Decrease rare_chest_coins"
+      ],
+      "MVP_testing": "Play through 5 runs, track average coins per floor, adjust as needed"
+    }
+  }
+}
+
+
+===== FILE: docs/specializations.json =====
+{
+  "specialization_system": {
+    "total_fields": 34,
+    "combo_rules": "Any 2+ fields combine UNLESS nonsensical (and all 34 are scientifically valid)",
+    "book_drop_economy": "Books drop like items (~5-10% per room), normal randomness, no meta-mechanics required upfront",
+    
+    "unlock_progression": {
+      "floor_1": {
+        "available_from_start": [
+          "Biology", "Chemistry", "Physics", "Geology", "Botany", "Zoology", "Engineering"
+        ],
+        "enemy_theme": "Basic organisms, cellular concepts",
+        "unlock_after_boss": ["Microbiology", "Neuroscience"],
+        "reason": "Fought cells/organisms, now can study them specifically"
+      },
+      "floor_2": {
+        "newly_available": ["Microbiology", "Neuroscience"],
+        "enemy_theme": "Marine/aquatic life, geological formations",
+        "unlock_after_boss": ["Marine Science", "Ecology", "Hydrology"],
+        "reason": "Explored water environments, now can specialize"
+      },
+      "floor_3": {
+        "newly_available": ["Marine Science", "Ecology", "Hydrology"],
+        "enemy_theme": "Ancient creatures, volcanoes, birds",
+        "unlock_after_boss": ["Paleontology", "Volcanology", "Ornithology"],
+        "reason": "Discovered fossil records, volcanic hazards, bird behavior"
+      },
+      "floor_4": {
+        "newly_available": ["Paleontology", "Volcanology", "Ornithology"],
+        "enemy_theme": "Weather phenomena, deep space, exotic life",
+        "unlock_after_boss": ["Mycology", "Entomology", "Genetics", "Immunology", "Seismology", "Meteorology"],
+        "reason": "Experienced atmospheric chaos, discovered alien patterns"
+      },
+      "floor_5": {
+        "newly_available": ["Mycology", "Entomology", "Genetics", "Immunology", "Seismology", "Meteorology"],
+        "enemy_theme": "Ultimate primordial entities",
+        "unlock_after_boss": ["Oceanography", "Toxicology", "Archaeology", "Quantum Physics", "Cosmology", "Mineralogy", "Virology", "Exobiology", "Climatology", "Astronomy", "Wildlife"],
+        "reason": "Reached origins, all knowledge revealed"
+      }
+    },
+
+    "base_fields_34": [
+      {
+        "id": "biology",
+        "name": "Biology",
+        "tier": 1,
+        "projectile": "Cell",
+        "damage": 1.0,
+        "debuff": null,
+        "visual_description": "Glowing organic cell"
+      },
+      {
+        "id": "chemistry",
+        "name": "Chemistry",
+        "tier": 1,
+        "projectile": "Molecule",
+        "damage": 1.0,
+        "debuff": null,
+        "visual_description": "Spinning molecular structure"
+      },
+      {
+        "id": "physics",
+        "name": "Physics",
+        "tier": 1,
+        "projectile": "Atom",
+        "damage": 1.1,
+        "debuff": "Momentum (knockback on hit)",
+        "visual_description": "Spinning atom with electron orbits"
+      },
+      {
+        "id": "geology",
+        "name": "Geology",
+        "tier": 1,
+        "projectile": "Rock",
+        "damage": 1.2,
+        "debuff": null,
+        "visual_description": "Sharp mineral shard"
+      },
+      {
+        "id": "botany",
+        "name": "Botany",
+        "tier": 1,
+        "projectile": "Seed Pod",
+        "damage": 0.9,
+        "debuff": "Entangle (slight slow)",
+        "visual_description": "Blooming seed pod"
+      },
+      {
+        "id": "zoology",
+        "name": "Zoology",
+        "tier": 1,
+        "projectile": "Animal",
+        "damage": 1.1,
+        "debuff": null,
+        "visual_description": "Small creature sprite (varies by combo)"
+      },
+      {
+        "id": "engineering",
+        "name": "Engineering",
+        "tier": 1,
+        "projectile": "Gear",
+        "damage": 1.0,
+        "debuff": null,
+        "visual_description": "Spinning gear or mechanical part"
+      },
+      {
+        "id": "microbiology",
+        "name": "Microbiology",
+        "tier": 2,
+        "projectile": "Microbe",
+        "damage": 1.0,
+        "debuff": "Infection (slow damage over time)",
+        "visual_description": "Tiny glowing bacteria"
+      },
+      {
+        "id": "marine_science",
+        "name": "Marine Science",
+        "tier": 2,
+        "projectile": "Water Drop",
+        "damage": 0.9,
+        "debuff": null,
+        "visual_description": "Glowing aquatic droplet"
+      },
+      {
+        "id": "ecology",
+        "name": "Ecology",
+        "tier": 2,
+        "projectile": "Ecosystem Fragment",
+        "damage": 1.0,
+        "debuff": null,
+        "visual_description": "Miniature ecosystem sphere"
+      },
+      {
+        "id": "astronomy",
+        "name": "Astronomy",
+        "tier": 2,
+        "projectile": "Star",
+        "damage": 1.0,
+        "debuff": null,
+        "visual_description": "Twinkling star or comet"
+      },
+      {
+        "id": "climatology",
+        "name": "Climatology",
+        "tier": 2,
+        "projectile": "Weather System",
+        "damage": 1.0,
+        "debuff": "Weather effect (varies: freeze, burn, wind)",
+        "visual_description": "Miniature weather cloud"
+      },
+      {
+        "id": "neuroscience",
+        "name": "Neuroscience",
+        "tier": 2,
+        "projectile": "Neuron",
+        "damage": 0.8,
+        "debuff": "Confusion (erratic enemy movement)",
+        "visual_description": "Firing neuron with synaptic sparks"
+      },
+      {
+        "id": "paleontology",
+        "name": "Paleontology",
+        "tier": 3,
+        "projectile": "Fossil Fragment",
+        "damage": 1.2,
+        "debuff": null,
+        "visual_description": "Ancient bone or fossil shard"
+      },
+      {
+        "id": "volcanology",
+        "name": "Volcanology",
+        "tier": 3,
+        "projectile": "Lava Blob",
+        "damage": 1.1,
+        "debuff": "Burn (damage over time)",
+        "visual_description": "Glowing molten rock"
+      },
+      {
+        "id": "ornithology",
+        "name": "Ornithology",
+        "tier": 3,
+        "projectile": "Bird",
+        "damage": 0.9,
+        "debuff": null,
+        "visual_description": "Pixel art bird sprite (varies by combo)"
+      },
+      {
+        "id": "exobiology",
+        "name": "Exobiology",
+        "tier": 3,
+        "projectile": "Alien Organism",
+        "damage": 1.1,
+        "debuff": "Alien Infection (strong debuff)",
+        "visual_description": "Strange otherworldly creature"
+      },
+      {
+        "id": "hydrology",
+        "name": "Hydrology",
+        "tier": 3,
+        "projectile": "Water Current",
+        "damage": 0.9,
+        "debuff": "Displacement (knockback but not as strong as Physics)",
+        "visual_description": "Flowing water stream"
+      },
+      {
+        "id": "wildlife",
+        "name": "Wildlife",
+        "tier": 3,
+        "projectile": "Animal",
+        "damage": 1.0,
+        "debuff": null,
+        "visual_description": "Various wildlife sprite"
+      },
+      {
+        "id": "mycology",
+        "name": "Mycology",
+        "tier": 4,
+        "projectile": "Mushroom Spore",
+        "damage": 0.9,
+        "debuff": "Poison (damage + weaken)",
+        "visual_description": "Glowing spore cloud"
+      },
+      {
+        "id": "entomology",
+        "name": "Entomology",
+        "tier": 4,
+        "projectile": "Insect Swarm",
+        "damage": 0.8,
+        "debuff": null,
+        "visual_description": "Multiple tiny insects"
+      },
+      {
+        "id": "genetics",
+        "name": "Genetics",
+        "tier": 4,
+        "projectile": "DNA Strand",
+        "damage": 1.0,
+        "debuff": null,
+        "visual_description": "Spiraling DNA helix"
+      },
+      {
+        "id": "immunology",
+        "name": "Immunology",
+        "tier": 4,
+        "projectile": "Antibody",
+        "damage": 0.9,
+        "debuff": "Disease (infects enemy, weakens them)",
+        "visual_description": "Y-shaped antibody glyph"
+      },
+      {
+        "id": "seismology",
+        "name": "Seismology",
+        "tier": 4,
+        "projectile": "Shockwave",
+        "damage": 1.1,
+        "debuff": "Tremor (weak stun)",
+        "visual_description": "Radiating seismic wave"
+      },
+      {
+        "id": "meteorology",
+        "name": "Meteorology",
+        "tier": 4,
+        "projectile": "Weather Front",
+        "damage": 1.0,
+        "debuff": "Weather effect",
+        "visual_description": "Moving weather pattern"
+      },
+      {
+        "id": "oceanography",
+        "name": "Oceanography",
+        "tier": 5,
+        "projectile": "Tidal Wave",
+        "damage": 1.0,
+        "debuff": "Displacement (knockback)",
+        "visual_description": "Small crashing wave"
+      },
+      {
+        "id": "toxicology",
+        "name": "Toxicology",
+        "tier": 5,
+        "projectile": "Poison Cloud",
+        "damage": 0.9,
+        "debuff": "Toxin (strong poison damage)",
+        "visual_description": "Noxious green cloud"
+      },
+      {
+        "id": "archaeology",
+        "name": "Archaeology",
+        "tier": 5,
+        "projectile": "Ancient Artifact",
+        "damage": 1.0,
+        "debuff": null,
+        "visual_description": "Glowing relic fragment"
+      },
+      {
+        "id": "quantum_physics",
+        "name": "Quantum Physics",
+        "tier": 5,
+        "projectile": "Quantum Particle",
+        "damage": 1.2,
+        "debuff": "Superposition (enemy briefly invulnerable then explodes)",
+        "visual_description": "Uncertain/flickering particle"
+      },
+      {
+        "id": "cosmology",
+        "name": "Cosmology",
+        "tier": 5,
+        "projectile": "Celestial Body",
+        "damage": 1.1,
+        "debuff": null,
+        "visual_description": "Small planet or star cluster"
+      },
+      {
+        "id": "mineralogy",
+        "name": "Mineralogy",
+        "tier": 5,
+        "projectile": "Crystal",
+        "damage": 1.1,
+        "debuff": null,
+        "visual_description": "Glowing crystal structure"
+      },
+      {
+        "id": "virology",
+        "name": "Virology",
+        "tier": 5,
+        "projectile": "Virus Particle",
+        "damage": 0.9,
+        "debuff": "Infection (strong debuff)",
+        "visual_description": "Spiky viral particle"
+      }
+    ],
+
+    "combination_rules": {
+      "rule_1": "Any 2+ fields combine",
+      "rule_2": "Projectile blends logically, then humorously",
+      "rule_3": "Debuffs stack if they make sense, otherwise strongest one applies",
+      "damage_calculation": "Average of all constituent fields",
+      "example_combinations": [
+        {
+          "combo": "Paleontology + Ornithology",
+          "name": "Paleornithologist",
+          "projectile": "Fossilized Bird",
+          "logic": "Ancient bird bones and feathers",
+          "visual": "Skeletal bird sprite with fossil texture",
+          "damage": 1.05,
+          "debuff": null
+        },
+        {
+          "combo": "Chemistry + Mycology",
+          "name": "Chemomycologist",
+          "projectile": "Poison Mushroom",
+          "logic": "Toxic fungal compound",
+          "visual": "Glowing purple mushroom",
+          "damage": 0.95,
+          "debuff": "Poison (damage + weaken)"
+        },
+        {
+          "combo": "Immunology + Virology",
+          "name": "Immunovirologist",
+          "projectile": "Viral Antibody Complex",
+          "logic": "Immune system attacking virus",
+          "visual": "Y-shaped antibody with virus attached",
+          "damage": 0.9,
+          "debuff": "Infection (antibody takes over enemy)"
+        },
+        {
+          "combo": "Physics + Zoology",
+          "name": "Zoophysicist",
+          "projectile": "Momentum Animal",
+          "logic": "Animal moving with force",
+          "visual": "Animal surrounded by momentum lines",
+          "damage": 1.1,
+          "debuff": "Knockback"
+        },
+        {
+          "combo": "Botany + Volcanology",
+          "name": "Botvolcanologist",
+          "projectile": "Burning Plant",
+          "logic": "Plant near lava, catches fire",
+          "visual": "Flaming seed pod",
+          "damage": 1.0,
+          "debuff": "Burn"
+        },
+        {
+          "combo": "Ornithology + Immunology",
+          "name": "Ornithimmunologist",
+          "projectile": "Sick Bird",
+          "logic": "Bird fighting infection",
+          "visual": "Bird with glowing antibodies around it",
+          "damage": 0.9,
+          "debuff": "Disease (bird spreads illness)"
+        },
+        {
+          "combo": "Paleontology + Microbiology + Exobiology",
+          "name": "Paleomicroexobiologist",
+          "projectile": "Ancient Alien Microbe",
+          "logic": "Fossil of alien bacteria from space",
+          "visual": "Crystalline ancient microbe with otherworldly glow",
+          "damage": 1.07,
+          "debuff": "Alien Infection"
+        }
+      ]
+    },
+
+    "character_unlock_structure": {
+      "note": "Future feature - not MVP - structure in place for adding character unlocks based on achievements",
+      "example": {
+        "student": "Default, available always",
+        "biologist": "Unlock by: Reach Floor 2 with 5 Biology books found",
+        "physicist": "Unlock by: Beat Floor 1 boss with Physics specialization",
+        "paleomicrobiologist": "Unlock by: Discover 3-tier combo, beat Floor 3 boss"
+      }
+    },
+
+    "stat_bonuses": {
+      "note": "Specializations only affect projectile type, damage scaling, and debuff. Speed and health come from artifacts only.",
+      "specialization_stat_effects": {
+        "damage_scaling": "Each specialization has base damage (0.8 - 1.2), averaged in combinations",
+        "speed": "No specialization bonuses - artifacts only",
+        "health": "No specialization bonuses - artifacts only"
+      }
+    }
+  }
+}
+
+
+===== FILE: docs/stats_system.json =====
+{
+  "stats_system": {
+    "description": "Simple stat system. Base stats modified by specializations, artifacts, and consumables.",
+    
+    "base_stats": {
+      "student_default": {
+        "damage": 1.0,
+        "speed": 1.0,
+        "health": 5,
+        "health_icon": "🧠",
+        "health_mechanic": "Brain counter. Each brain = 1 HP. Die at 0 brains."
+      }
+    },
+
+    "specialization_stat_effects": {
+      "philosophy": "Specializations change projectile type and debuff, NOT base stats",
+      "damage": "No specialization base damage bonus - damage scaling comes from artifacts",
+      "speed": "No specialization base speed bonus - speed comes from artifacts",
+      "health": "No specialization health bonus - health comes from consumables and books",
+      "note": "Specializations are purely about HOW you attack (projectile + debuff), not raw stats"
+    },
+
+    "artifact_stat_effects": {
+      "weapon_artifacts": {
+        "philosophy": "Modify damage, speed, and shooting patterns",
+        "mechanics": "Multiplicative stacking",
+        "example": {
+          "base_damage": 1.0,
+          "battery_equipped": "1.0 × 1.2 = 1.2 damage",
+          "microscope_equipped": "base × 1.25 = 1.25× speed multiplier",
+          "both_equipped": "1.2 damage × 1.25 speed"
+        },
+        "shooting_patterns": [
+          {
+            "pattern": "rapid_fire",
+            "effect": "Increased attack speed",
+            "example_artifact": "Microscope gives +25% fire rate"
+          },
+          {
+            "pattern": "spread_shot",
+            "effect": "Multiple projectiles in cone",
+            "example_artifact": "Prism creates split projectiles"
+          },
+          {
+            "pattern": "charge_shot",
+            "effect": "Hold button to build power",
+            "example_artifact": "Battery enables charging"
+          },
+          {
+            "pattern": "burst",
+            "effect": "Fire 3+ shots rapidly",
+            "example_artifact": "Electron Microscope fires bursts"
+          },
+          {
+            "pattern": "piercing",
+            "effect": "Projectiles pass through enemies",
+            "example_artifact": "Lens creates focused piercing beam"
+          },
+          {
+            "pattern": "bouncing",
+            "effect": "Projectiles ricochet off walls",
+            "example_artifact": "Light Source creates bouncing light"
+          }
+        ]
+      },
+
+      "consumable_artifacts": {
+        "philosophy": "Flat bonuses to health and speed",
+        "stacking": "Multiple of same type stack",
+        "burrito": {
+          "effect": "+1 health (brain)",
+          "stacking": "2 Burritos = +2 health total",
+          "consumed": true
+        },
+        "energy_drink": {
+          "effect": "+0.1 speed multiplier",
+          "stacking": "2 Energy Drinks = +0.2 speed multiplier",
+          "consumed": true
+        }
+      }
+    },
+
+    "health_system": {
+      "health_representation": "Brains (🧠)",
+      "base_health": 5,
+      "display": "5 brain icons = 5 HP",
+      "damage": "Each hit = -1 brain (simple)",
+      "death": "Reach 0 brains = death",
+      
+      "gaining_health": {
+        "method_1": "Find consumable Burrito artifact",
+        "method_2": "Unlock specialization with book",
+        "specialization_health": "Each new specialization discovered = +1 max health",
+        "example": {
+          "start": "5 brains (student)",
+          "find_biology_book": "6 brains (Biologist)",
+          "find_chemistry_book": "7 brains (can combine to Biochemist)",
+          "find_burrito": "8 brains total"
+        }
+      }
+    },
+
+    "artifact_combination_stat_bonuses": {
+      "philosophy": "Combinations get enhanced stats compared to base artifacts",
+      "example_1": {
+        "base_battery": {
+          "damage": 1.2,
+          "speed": 1.0,
+          "pattern": null
+        },
+        "base_microscope": {
+          "damage": 1.0,
+          "speed": 1.25,
+          "pattern": "rapid_fire"
+        },
+        "combined_electron_microscope": {
+          "damage": 1.35,
+          "speed": 1.25,
+          "pattern": "rapid_fire + burst",
+          "bonus": "Smaller bullets, way faster, burst fire"
+        }
+      },
+      "example_2": {
+        "base_lens": {
+          "damage": 1.15,
+          "speed": 1.1,
+          "pattern": "focused_beam"
+        },
+        "base_prism": {
+          "damage": 1.0,
+          "speed": 1.0,
+          "pattern": "spread_shot"
+        },
+        "combined_spectroscope": {
+          "damage": 1.2,
+          "speed": 1.15,
+          "pattern": "spread_shot + piercing",
+          "bonus": "Multiple projectiles that pierce through enemies"
+        }
+      }
+    },
+
+    "stat_calculation_order": {
+      "step_1": "Base stats (1.0 damage, 1.0 speed)",
+      "step_2": "Apply weapon artifact slot 1",
+      "step_3": "Apply weapon artifact slot 2 (multiplicative)",
+      "step_4": "Apply consumable artifact bonuses (additive for speed)",
+      "step_5": "Final: damage × speed × any special modifiers",
+      "example": {
+        "start": "1.0 damage, 1.0 speed",
+        "battery_slot_1": "1.0 × 1.2 = 1.2 damage",
+        "microscope_slot_2": "1.2 damage × 1.25 speed = 1.5 dps",
+        "consumed_energy_drink": "1.5 × (1.0 + 0.1) = 1.65 final dps",
+        "pattern": "Rapid fire burst, small bullets"
+      }
+    },
+
+    "gameplay_progression": {
+      "early_game": {
+        "stats": "1.0 damage, 1.0 speed, 5 health",
+        "projectile": "Specialization default (Cell, Atom, etc.)",
+        "pattern": "Single shots"
+      },
+      "mid_game": {
+        "stats": "1.2 damage (Battery), 1.25 speed (Microscope), 7 health (found 2 specs + burrito)",
+        "projectile": "Electron Microscope visuals",
+        "pattern": "Rapid fire bursts, smaller bullets"
+      },
+      "late_game": {
+        "stats": "1.5+ damage, 1.3+ speed, 10+ health",
+        "projectile": "Ultra-rare combinations (Quantum Microscope, etc.)",
+        "pattern": "Piercing spreads, bouncing charges, complex combos"
+      }
+    },
+
+    "specialization_health_unlocks": {
+      "philosophy": "Finding a new specialization book grants +1 max health",
+      "purpose": "Encourages variety, rewards exploration",
+      "mechanics": {
+        "find_first_book": "Gain specialization + 1 health",
+        "find_same_book_again": "No additional health (only first discovery counts)",
+        "combining_specs": "No extra health (just the initial discoveries)"
+      },
+      "example_progression": {
+        "student": "5 health",
+        "biology_book": "6 health (Biologist unlocked)",
+        "chemistry_book": "7 health (Biochemist now available)",
+        "physics_book": "8 health (Biophysicist now available)",
+        "microbiology_book": "9 health (Paleomicrobiologist now available)",
+        "burrito_consumed": "10 health (consumable stacks)"
+      }
+    }
+  }
+}
+
+
+===== FILE: src/index.html =====
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Lab - Roguelike Roguelike</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui-container">
+            <div id="hud">
+                <div id="health-display">
+                    <span class="label">Brains:</span>
+                    <div id="brain-counter"></div>
+                </div>
+                <div id="floor-display">
+                    <span class="label">Floor:</span>
+                    <span id="floor-number">1</span>
+                </div>
+                <div id="room-display">
+                    <span class="label">Room:</span>
+                    <span id="room-number">1/1</span>
+                </div>
+                <div id="coins-display">
+                    <span class="label">Coins:</span>
+                    <span id="coin-count">0</span>
+                </div>
+            </div>
+            <div id="inventory-display">
+                <span class="label">Equipment:</span>
+                <div id="weapon-slots">
+                    <div class="weapon-slot" id="slot-1">Empty</div>
+                    <div class="weapon-slot" id="slot-2">Empty</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Menu Overlay -->
+    <div id="menu-overlay" class="overlay">
+        <div class="menu-panel">
+            <h1>THE LAB</h1>
+            <p>A descent into discovery</p>
+            <button id="start-button" class="menu-button">START RUN</button>
+            <button id="codex-button" class="menu-button">CODEX</button>
+            <button id="settings-button" class="menu-button">SETTINGS</button>
+        </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pause-overlay" class="overlay hidden">
+        <div class="menu-panel">
+            <h2>PAUSED</h2>
+            <button id="resume-button" class="menu-button">RESUME</button>
+            <button id="codex-pause-button" class="menu-button">CODEX</button>
+            <button id="quit-button" class="menu-button">QUIT TO MENU</button>
+        </div>
+    </div>
+
+    <!-- Codex -->
+    <div id="codex-overlay" class="overlay hidden">
+        <div class="codex-panel">
+            <h2>CODEX</h2>
+            <div id="codex-content">
+                <div class="codex-section">
+                    <h3>Specializations</h3>
+                    <div id="codex-specs"></div>
+                </div>
+                <div class="codex-section">
+                    <h3>Artifacts</h3>
+                    <div id="codex-artifacts"></div>
+                </div>
+            </div>
+            <button id="close-codex-button" class="menu-button">CLOSE</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameover-overlay" class="overlay hidden">
+        <div class="menu-panel">
+            <h2 id="gameover-title">GAME OVER</h2>
+            <div id="gameover-stats">
+                <p id="gameover-floors">Floors Reached: 1</p>
+                <p id="gameover-rooms">Rooms Cleared: 0</p>
+                <p id="gameover-time">Time: 0:00</p>
+            </div>
+            <button id="retry-button" class="menu-button">TRY AGAIN</button>
+            <button id="menu-button" class="menu-button">MAIN MENU</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/loader.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/enemy.js"></script>
+    <script src="js/room.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
+
+
+===== FILE: src/js/game.js =====
+// game.js - Main game loop and state management
+
+class Game {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.canvas.width = window.innerWidth - 10;
+        this.canvas.height = window.innerHeight - 10;
+
+        this.player = null;
+        this.currentFloor = 1;
+        this.currentRoom = 1;
+        this.currentRoomObject = null;
+        this.totalRoomsPerFloor = 1; // Updated from floor data at room generation
+        
+        this.gameState = 'menu'; // menu, playing, paused, gameover
+        this.isPaused = false;
+        this.startTime = 0;
+        this.elapsedTime = 0;
+        
+        // Stats tracking
+        this.stats = {
+            floorsReached: 1,
+            roomsCleared: 0,
+            enemiesKilled: 0,
+            totalCoins: 0,
+            startTime: Date.now()
+        };
+
+        this.setupEventListeners();
+        this.gameLoop = this.update.bind(this);
+    }
+
+    setupEventListeners() {
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') this.togglePause();
+        });
+
+        window.addEventListener('resize', () => {
+            this.canvas.width = window.innerWidth - 10;
+            this.canvas.height = window.innerHeight - 10;
+        });
+    }
+
+    start() {
+        console.log("Game starting...");
+        this.gameState = 'playing';
+        this.isPaused = false;
+        this.startTime = Date.now();
+        this.initializeGame();
+        this.animate(0);
+    }
+
+    initializeGame() {
+        // Initialize player
+        this.player = new Player(
+            this.canvas.width / 2,
+            this.canvas.height / 2,
+            this.canvas
+        );
+
+        // Generate first room
+        this.generateRoom();
+    }
+
+    generateRoom() {
+        const floorData = gameLoader.getFloorData(this.currentFloor);
+        const configuredRoomCount = Number(floorData?.total_rooms);
+        if (Number.isFinite(configuredRoomCount) && configuredRoomCount > 0) {
+            this.totalRoomsPerFloor = configuredRoomCount;
+        }
+
+        this.currentRoomObject = new Room(
+            this.currentFloor,
+            this.currentRoom,
+            this.totalRoomsPerFloor,
+            this.canvas
+        );
+
+        console.log(`Generated Floor ${this.currentFloor}, Room ${this.currentRoom}/${this.totalRoomsPerFloor}`);
+    }
+
+    nextRoom() {
+        if (this.currentRoom < this.totalRoomsPerFloor) {
+            this.currentRoom++;
+            this.stats.roomsCleared++;
+            this.generateRoom();
+        } else {
+            this.nextFloor();
+        }
+    }
+
+    nextFloor() {
+        if (this.currentFloor < 5) {
+            this.currentFloor++;
+            this.currentRoom = 1;
+            this.stats.floorsReached = this.currentFloor;
+            this.generateRoom();
+        } else {
+            // Game victory!
+            this.victory();
+        }
+    }
+
+    update(deltaTime) {
+        if (this.gameState === 'menu') return;
+        if (this.isPaused) return;
+
+        // Update player
+        this.player.update(deltaTime);
+
+        // Update current room
+        if (this.currentRoomObject) {
+            this.currentRoomObject.update(deltaTime, this.player);
+
+            // Check if player died
+            if (this.player.health <= 0) {
+                this.gameOver();
+                return;
+            }
+
+            // Check if room is cleared
+            if (this.currentRoomObject.isCleared()) {
+                // Wait a moment before advancing
+                setTimeout(() => {
+                    if (this.gameState === 'playing') {
+                        this.nextRoom();
+                    }
+                }, 500);
+            }
+        }
+
+        // Update HUD
+        uiManager.updateHUD(
+            this.player,
+            this.currentFloor,
+            this.currentRoom,
+            this.totalRoomsPerFloor
+        );
+
+        // Update elapsed time
+        this.elapsedTime = (Date.now() - this.startTime) / 1000;
+    }
+
+    draw() {
+        // Clear canvas
+        this.ctx.fillStyle = '#0f1425';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Draw room
+        if (this.currentRoomObject) {
+            this.currentRoomObject.draw(this.ctx);
+        }
+
+        // Draw player
+        this.player.draw(this.ctx);
+
+        // Draw debug info
+        this.drawDebugInfo();
+    }
+
+    drawDebugInfo() {
+        this.ctx.fillStyle = '#00ff00';
+        this.ctx.font = '10px Courier';
+        this.ctx.fillText(`FPS: ${Math.round(1000/16)}`, 10, this.canvas.height - 10);
+        this.ctx.fillText(`Player Pos: ${Math.round(this.player.x)}, ${Math.round(this.player.y)}`, 10, this.canvas.height - 20);
+        this.ctx.fillText(`Enemies: ${this.currentRoomObject.enemies.length}`, 10, this.canvas.height - 30);
+    }
+
+    togglePause() {
+        if (this.gameState === 'playing') {
+            this.isPaused = !this.isPaused;
+            if (this.isPaused) {
+                uiManager.showPauseMenu();
+            }
+        }
+    }
+
+    gameOver() {
+        this.gameState = 'gameover';
+        this.stats.elapsedTime = this.elapsedTime;
+        uiManager.showGameOver(this.stats);
+        console.log("Game Over!", this.stats);
+    }
+
+    victory() {
+        this.gameState = 'victory';
+        alert("VICTORY! You defeated The Infinitum!");
+        this.gameOver();
+    }
+
+    animate(lastTime) {
+        const now = performance.now();
+        const deltaTime = Math.min((now - lastTime) / 1000, 0.016); // Cap at 60fps
+
+        this.update(deltaTime);
+        this.draw();
+
+        if (this.gameState !== 'menu' && this.gameState !== 'gameover') {
+            requestAnimationFrame((time) => this.animate(time));
+        }
+    }
+}
+
+// Initialize game when document loads
+let game = null;
+
+window.addEventListener('DOMContentLoaded', async () => {
+    console.log("DOM loaded, loading game data...");
+    
+    // Load all game data first
+    const dataLoaded = await gameLoader.loadAllData();
+    
+    if (!dataLoaded) {
+        console.error("Failed to load game data");
+        alert("Failed to load game data. Check console for errors.");
+        return;
+    }
+
+    // Initialize game
+    const canvas = document.getElementById('gameCanvas');
+    game = new Game(canvas);
+
+    // Handle start button
+    window.gameReady = false;
+    window.gameRunning = false;
+    window.gamePaused = false;
+
+    // Poll for start signal from UI
+    const checkForStart = setInterval(() => {
+        if (window.gameReady) {
+            window.gameReady = false;
+            window.gameRunning = true;
+            clearInterval(checkForStart);
+            game.start();
+        }
+    }, 100);
+
+    console.log("Game initialized and ready!");
+});
+
+// Handle pause signal from UI
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && window.gameRunning && game) {
+        if (window.gamePaused) {
+            window.gamePaused = false;
+            game.isPaused = false;
+        } else {
+            window.gamePaused = true;
+            game.isPaused = true;
+            uiManager.showPauseMenu();
+        }
+    }
+});
+
+
+===== FILE: src/js/player.js =====
+// player.js - Player entity and controls
+
+class Player {
+    constructor(x, y, canvas) {
+        this.x = x;
+        this.y = y;
+        this.canvas = canvas;
+        this.width = 32;
+        this.height = 32;
+        this.speed = 3;
+        this.health = 5; // brains
+        this.maxHealth = 5;
+        
+        // Input state
+        this.inputX = 0;
+        this.inputY = 0;
+        this.shootX = 0;
+        this.shootY = 0;
+        
+        // Weapon system
+        this.weaponSlot1 = null;
+        this.weaponSlot2 = null;
+        this.projectiles = [];
+        this.shootCooldown = 0;
+        this.shootRate = 0.15; // seconds between shots
+        
+        // Stats
+        this.damageMultiplier = 1.0;
+        this.speedMultiplier = 1.0;
+        this.coins = 0;
+        
+        // Specialization
+        this.currentSpecialization = "Student";
+        
+        this.setupInputs();
+    }
+
+    setupInputs() {
+        // Keyboard input for movement (arrow keys or WASD)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.inputY = -1;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') this.inputY = 1;
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.inputX = -1;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.inputX = 1;
+            if (e.key === 'Escape') this.onPausePressed();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') this.inputY = 0;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') this.inputY = 0;
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') this.inputX = 0;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') this.inputX = 0;
+        });
+
+        // Mouse for shooting (right stick alternative)
+        window.addEventListener('mousemove', (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            this.shootX = e.clientX - rect.left - this.x;
+            this.shootY = e.clientY - rect.top - this.y;
+        });
+
+        window.addEventListener('click', () => {
+            this.shoot();
+        });
+    }
+
+    update(deltaTime) {
+        // Movement
+        const moveSpeed = this.speed * this.speedMultiplier;
+        this.x += this.inputX * moveSpeed;
+        this.y += this.inputY * moveSpeed;
+
+        // Boundary check
+        this.x = Math.max(0, Math.min(this.canvas.width - this.width, this.x));
+        this.y = Math.max(0, Math.min(this.canvas.height - this.height, this.y));
+
+        // Update shooting cooldown
+        this.shootCooldown = Math.max(0, this.shootCooldown - deltaTime);
+
+        // Update projectiles
+        this.projectiles = this.projectiles.filter(p => {
+            p.update(deltaTime);
+            return p.isAlive;
+        });
+    }
+
+    shoot() {
+        if (this.shootCooldown <= 0) {
+            const angle = Math.atan2(this.shootY, this.shootX);
+            const projectile = new Projectile(
+                this.x + this.width / 2,
+                this.y + this.height / 2,
+                Math.cos(angle) * 5,
+                Math.sin(angle) * 5,
+                this.damageMultiplier
+            );
+            this.projectiles.push(projectile);
+            this.shootCooldown = this.shootRate;
+        }
+    }
+
+    takeDamage(amount) {
+        this.health -= amount;
+        if (this.health < 0) this.health = 0;
+        return this.health <= 0; // Return true if dead
+    }
+
+    heal(amount) {
+        this.health = Math.min(this.maxHealth, this.health + amount);
+    }
+
+    addHealth(amount) {
+        this.maxHealth += amount;
+        this.health = this.maxHealth;
+    }
+
+    equipArtifact(artifact, slot) {
+        if (slot === 1) this.weaponSlot1 = artifact;
+        if (slot === 2) this.weaponSlot2 = artifact;
+        this.recalculateStats();
+    }
+
+    recalculateStats() {
+        let damageMultiplier = 1.0;
+        let speedMultiplier = 1.0;
+
+        if (this.weaponSlot1) {
+            damageMultiplier *= this.weaponSlot1.stats.damage_multiplier;
+            speedMultiplier *= this.weaponSlot1.stats.speed_multiplier;
+        }
+        if (this.weaponSlot2) {
+            damageMultiplier *= this.weaponSlot2.stats.damage_multiplier;
+            speedMultiplier *= this.weaponSlot2.stats.speed_multiplier;
+        }
+
+        this.damageMultiplier = damageMultiplier;
+        this.speedMultiplier = speedMultiplier;
+    }
+
+    draw(ctx) {
+        // Draw player as simple colored square (placeholder)
+        ctx.fillStyle = '#00ff00';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        
+        // Draw border
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+        // Draw projectiles
+        ctx.fillStyle = '#ffff00';
+        this.projectiles.forEach(p => p.draw(ctx));
+    }
+
+    onPausePressed() {
+        // Handled by game.js
+    }
+
+    isCollidingWith(bounds) {
+        return !(this.x + this.width < bounds.x || bounds.x + bounds.width < this.x ||
+                 this.y + this.height < bounds.y || bounds.y + bounds.height < this.y);
+    }
+}
+
+class Projectile {
+    constructor(x, y, vx, vy, damage = 1.0) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.width = 8;
+        this.height = 8;
+        this.damage = damage;
+        this.isAlive = true;
+        this.lifetime = 5; // seconds
+        this.age = 0;
+    }
+
+    update(deltaTime) {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.age += deltaTime;
+
+        if (this.age > this.lifetime) {
+            this.isAlive = false;
+        }
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = '#ffff00';
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        
+        ctx.strokeStyle = '#ff8800';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+    }
+
+    getBounds() {
+        return {
+            x: this.x - this.width / 2,
+            y: this.y - this.height / 2,
+            width: this.width,
+            height: this.height
+        };
+    }
+}
+
+

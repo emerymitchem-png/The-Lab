@@ -1,10 +1,10 @@
 {
   "game_loop": {
-    "philosophy": "Single run = 13 rooms per floor × 5 floors = 65 rooms maximum. Death = game over. Meta-progression through discoveries.",
+    "philosophy": "Single run = scaled floors (11→13→14→14→13 rooms) = 65 rooms maximum. Death = game over. Meta-progression through discoveries.",
     
     "run_structure": {
       "total_rooms_per_run": 65,
-      "formula": "13 rooms/floor × 5 floors",
+      "formula": "11 + 13 + 14 + 14 + 13 rooms",
       "death_condition": "Reach 0 brains (health) = game over",
       "victory_condition": "Defeat The Infinitum boss on Floor 5"
     },
@@ -263,7 +263,7 @@
       ],
 
       "what_stays_consistent": [
-        "Floor layouts (13 rooms each floor)",
+        "Floor layouts (scaled per floor: 11→13→14→14→13)",
         "Floor progression (always 1→2→3→4→5)",
         "Boss health pools (same per floor across runs)",
         "Artifact stat values (Battery always 1.2 damage)",

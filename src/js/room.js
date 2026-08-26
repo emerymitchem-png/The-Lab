@@ -1,11 +1,11 @@
 (function () {
   "use strict";
 
-  const ROOM_VERSION = "1.0.24";
+  const ROOM_VERSION = "1.0.25";
   const DEFAULT_ROOM_WIDTH = 960;
   const DEFAULT_ROOM_HEIGHT = 640;
   const DEFAULT_WALL_THICKNESS = 36;
-  const ROOMS_PER_FLOOR = 13;
+  const DEFAULT_ROOMS_PER_FLOOR = 13;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -28,6 +28,72 @@
   function getDifficultyScale(floor) {
     const safeFloor = clamp(safeNumber(floor, 1), 1, 5);
     return 1 + ((safeFloor - 1) * 0.125);
+  }
+
+  function safeInt(value, fallback) {
+    return Math.round(safeNumber(value, fallback));
+  }
+
+  function normalizeRoomTypeName(value) {
+    const key = String(value || "normal").toLowerCase();
+    if (key === "normal_room" || key === "normal_rooms") return "normal";
+    if (key === "secret_room" || key === "secret_rooms") return "secret";
+    if (key === "shop_room") return "shop";
+    if (key === "boss_room") return "boss";
+    if (key === "marked_unlocked_door" || key === "marked_door" || key === "marked") return "marked";
+    if (key === "shop_locked_door" || key === "locked_shop") return "shop_locked";
+    if (key === "mystery_door" || key === "mystery") return "mystery";
+    if (key === "shop_or_mystery_door") return "mystery";
+    return key;
+  }
+
+  function deterministicPick(seed, probability) {
+    const unit = Math.abs(Math.sin(seed * 91.337 + 0.618)) % 1;
+    return unit < probability;
+  }
+
+  function buildGeneratedRoomPlan(floor, nested, roomsPerFloor) {
+    const guaranteed = nested.guaranteed_rooms || nested.guaranteedRooms || {};
+    const procedural = nested.procedural_room || nested.proceduralRoom || {};
+    const proceduralProbability = procedural.probability || {};
+
+    const plan = new Array(Math.max(1, roomsPerFloor)).fill("normal");
+    const lastIndex = plan.length - 1;
+    plan[lastIndex] = "boss";
+
+    const specialTypes = [];
+    const pushMany = (type, count) => {
+      for (let i = 0; i < count; i += 1) {
+        specialTypes.push(normalizeRoomTypeName(type));
+      }
+    };
+
+    pushMany("secret", Math.max(0, safeInt(guaranteed.secret_rooms, 0)));
+    pushMany("shop", Math.max(0, safeInt(guaranteed.shop_room, 0)));
+    pushMany("marked", Math.max(0, safeInt(guaranteed.marked_unlocked_door, 0)));
+
+    const proceduralCount = Math.max(0, safeInt(procedural.count, 0));
+    const mysteryChance = clamp(safeNumber(proceduralProbability.mystery_door, 0.25), 0, 1);
+    for (let i = 0; i < proceduralCount; i += 1) {
+      const isMystery = deterministicPick(floor * 1000 + i * 13 + roomsPerFloor, mysteryChance);
+      specialTypes.push(isMystery ? "mystery" : "shop_locked");
+    }
+
+    const available = [];
+    for (let i = 0; i < lastIndex; i += 1) {
+      available.push(i);
+    }
+
+    for (let i = 0; i < specialTypes.length && available.length > 0; i += 1) {
+      const pickIndex = Math.abs((floor * 37 + i * 17 + roomsPerFloor * 11) % available.length);
+      const slot = available.splice(pickIndex, 1)[0];
+      if (slot > 0) {
+        plan[slot] = specialTypes[i];
+      }
+    }
+
+    plan[0] = "normal";
+    return plan;
   }
 
   function getLoader() {
@@ -60,7 +126,15 @@
 
     return {
       floor,
-      roomsPerFloor: safeNumber(nested.roomsPerFloor ?? nested.rooms_per_floor ?? nested.roomCount ?? nested.room_count, ROOMS_PER_FLOOR),
+      roomsPerFloor: safeNumber(
+        nested.total_rooms ??
+        nested.totalRooms ??
+        nested.roomsPerFloor ??
+        nested.rooms_per_floor ??
+        nested.roomCount ??
+        nested.room_count,
+        DEFAULT_ROOMS_PER_FLOOR
+      ),
       width: safeNumber(nested.width ?? nested.roomWidth ?? nested.room_width, DEFAULT_ROOM_WIDTH),
       height: safeNumber(nested.height ?? nested.roomHeight ?? nested.room_height, DEFAULT_ROOM_HEIGHT),
       wallThickness: safeNumber(nested.wallThickness ?? nested.wall_thickness, DEFAULT_WALL_THICKNESS),
@@ -68,8 +142,27 @@
       enemyCountMax: safeNumber(nested.enemyCountMax ?? nested.enemy_count_max ?? nested.maxEnemies ?? nested.max_enemies, 3),
       spawnRate: safeNumber(nested.spawnRate ?? nested.spawn_rate ?? nested.enemySpawnRate ?? nested.enemy_spawn_rate, 1),
       difficultyScale: safeNumber(nested.difficultyScale ?? nested.difficulty_scale, getDifficultyScale(floor)),
-      rooms: Array.isArray(nested.rooms) ? nested.rooms : []
+      rooms: []
     };
+
+    const explicitRooms = Array.isArray(nested.rooms) ? nested.rooms : [];
+    const normalizedExplicitRooms = explicitRooms
+      .map((entry) => normalizeRoomTypeName(typeof entry === "string" ? entry : entry && entry.type))
+      .filter(Boolean);
+
+    const generatedRooms = buildGeneratedRoomPlan(floor, nested, normalized.roomsPerFloor);
+    const plannedRooms = normalizedExplicitRooms.length > 0 ? normalizedExplicitRooms : generatedRooms;
+
+    normalized.rooms = plannedRooms.slice(0, normalized.roomsPerFloor);
+    while (normalized.rooms.length < normalized.roomsPerFloor) {
+      normalized.rooms.push("normal");
+    }
+
+    if (normalized.rooms.length > 0) {
+      normalized.rooms[normalized.rooms.length - 1] = "boss";
+    }
+
+    return normalized;
   }
 
   function getRoomType(roomNumber, floorData) {
@@ -78,7 +171,7 @@
     const explicitType = typeof roomEntry === "string" ? roomEntry : roomEntry && roomEntry.type;
 
     if (explicitType) {
-      return String(explicitType).toLowerCase();
+      return normalizeRoomTypeName(explicitType);
     }
 
     if (roomNumber === floorData.roomsPerFloor) {
@@ -194,25 +287,26 @@
     constructor(floor = 1, roomNumber = 1, options = {}) {
       this.version = ROOM_VERSION;
       this.floor = clamp(safeNumber(floor, 1), 1, 5);
-      this.roomNumber = clamp(safeNumber(roomNumber, 1), 1, ROOMS_PER_FLOOR);
-      this.roomIndex = this.roomNumber - 1;
 
       const rawFloorData = options.floorData || callLoaderMethod("getFloorData", this.floor);
       this.floorData = normalizeFloorData(rawFloorData, this.floor);
       this.floorData.roomsPerFloor = clamp(this.floorData.roomsPerFloor, 1, 99);
+      this.roomNumber = clamp(safeNumber(roomNumber, 1), 1, this.floorData.roomsPerFloor);
+      this.roomIndex = this.roomNumber - 1;
 
       this.width = safeNumber(options.width, this.floorData.width);
       this.height = safeNumber(options.height, this.floorData.height);
       this.wallThickness = safeNumber(options.wallThickness, this.floorData.wallThickness);
       this.difficultyScale = safeNumber(options.difficultyScale, this.floorData.difficultyScale);
 
-      this.type = String(options.type || getRoomType(this.roomNumber, this.floorData)).toLowerCase();
-      this.cleared = this.type === "shop";
+      this.type = normalizeRoomTypeName(options.type || getRoomType(this.roomNumber, this.floorData));
+      const isSafeType = this.type === "shop" || this.type === "shop_locked" || this.type === "marked";
+      this.cleared = isSafeType;
       this.rewardGiven = false;
       this.started = false;
       this.clearTimer = this.cleared ? 99 : 0;
       this.clearDelay = 0.35;
-      this.exitOpen = this.type === "shop";
+      this.exitOpen = isSafeType;
       this.exitUsed = false;
       this.feedbackTexts = [];
 
@@ -222,13 +316,16 @@
       this.enemies = [];
       this.spawnEnemies(options.enemyData);
 
-      if (this.type === "shop") {
-        this.addFeedback("SHOP - Exit is open", this.width / 2, this.height / 2 - 80, "#facc15");
+      if (isSafeType) {
+        const label = this.type === "marked" ? "MARKED ROOM" : "SHOP";
+        this.addFeedback(`${label} - Exit is open`, this.width / 2, this.height / 2 - 80, "#facc15");
       }
     }
 
-    static roomsPerFloor() {
-      return ROOMS_PER_FLOOR;
+    static roomsPerFloor(floor = 1) {
+      const safeFloor = clamp(safeNumber(floor, 1), 1, 5);
+      const floorData = normalizeFloorData(callLoaderMethod("getFloorData", safeFloor), safeFloor);
+      return clamp(safeNumber(floorData.roomsPerFloor, DEFAULT_ROOMS_PER_FLOOR), 1, 99);
     }
 
     static difficultyScaleForFloor(floor) {
@@ -324,12 +421,14 @@
 
       const layout = this.getLayoutName();
 
-      if (this.type === "shop") {
+      if (this.type === "shop" || this.type === "shop_locked") {
         walls.push(...this.makeShopObstacles());
       } else if (this.type === "boss") {
         walls.push(...this.makeBossObstacles());
       } else if (this.type === "secret") {
         walls.push(...this.makeSecretObstacles());
+      } else if (this.type === "marked") {
+        walls.push(...this.makeMarkedObstacles());
       } else if (layout === "cross") {
         walls.push(...this.makeCrossObstacles());
       } else if (layout === "lanes") {
@@ -415,6 +514,16 @@
       ];
     }
 
+    makeMarkedObstacles() {
+      const w = this.width;
+      const h = this.height;
+      return [
+        this.makeLabBench(w * 0.25, h * 0.35, 92, 44, "marker_totem"),
+        this.makeLabBench(w * 0.63, h * 0.35, 92, 44, "marker_totem"),
+        this.makeLabBench(w * 0.45, h * 0.58, 96, 62, "reward_altar")
+      ];
+    }
+
     makeBossObstacles() {
       const w = this.width;
       const h = this.height;
@@ -438,7 +547,7 @@
     }
 
     getEnemyCount() {
-      if (this.type === "shop") return 0;
+      if (this.type === "shop" || this.type === "shop_locked" || this.type === "marked") return 0;
       if (this.type === "boss") return 1;
 
       const min = Math.max(1, Math.round(this.floorData.enemyCountMin));
@@ -446,7 +555,7 @@
       const floorBonus = Math.floor((this.floor - 1) / 2);
       const roomBonus = this.roomNumber > 8 ? 1 : 0;
       const base = min + ((this.floor * 7 + this.roomNumber * 5) % (max - min + 1));
-      const typeBonus = this.type === "secret" ? 1 : 0;
+      const typeBonus = this.type === "secret" ? 1 : this.type === "mystery" ? 2 : 0;
       return clamp(Math.round((base + floorBonus + roomBonus + typeBonus) * this.floorData.spawnRate), 1, 8);
     }
 
@@ -618,6 +727,9 @@
         normal: "#152033",
         secret: "#1e1b4b",
         shop: "#1f2933",
+        shop_locked: "#3f1d1d",
+        marked: "#052e2b",
+        mystery: "#3b0764",
         boss: "#2a1620"
       };
 
@@ -726,6 +838,6 @@
   }
 
   Room.VERSION = ROOM_VERSION;
-  Room.ROOMS_PER_FLOOR = ROOMS_PER_FLOOR;
+  Room.ROOMS_PER_FLOOR = DEFAULT_ROOMS_PER_FLOOR;
   window.Room = Room;
 })();

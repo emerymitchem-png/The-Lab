@@ -8,9 +8,8 @@
 </head>
 <body>
     <div id="game-container">
-        <canvas id="gameCanvas"></canvas>
-        <div id="ui-container">
-            <div id="notification-container"></div>
+        <!-- HUD bar: lives above the canvas, never overlaps -->
+        <div id="hud-bar">
             <div id="hud">
                 <div id="health-display">
                     <span class="label">Brains:</span>
@@ -35,6 +34,14 @@
                     <div class="weapon-slot" id="slot-1">Empty</div>
                     <div class="weapon-slot" id="slot-2">Empty</div>
                 </div>
+            </div>
+        </div>
+        <!-- Canvas fills all remaining height -->
+        <div id="canvas-wrap">
+            <canvas id="gameCanvas"></canvas>
+            <!-- Notification toasts float over canvas only -->
+            <div id="ui-container">
+                <div id="notification-container"></div>
             </div>
         </div>
     </div>

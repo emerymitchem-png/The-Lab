@@ -1,10 +1,9 @@
 // room.js - Room generation, rendering, and door-based navigation
 
 const TILE = 40;
-const WALL = 48;          // wall thickness in px
-const DOOR_W = 80;        // door opening width
-const DOOR_H = WALL;      // door depth (same as wall)
-const HUD_H = 60;         // height reserved for HUD at top
+const WALL = 48;       // wall thickness in px
+const DOOR_W = 80;     // door opening width
+const DOOR_H = WALL;   // door depth
 
 // ── FloorMap ────────────────────────────────────────────────────────────────
 // Pre-plans the ordered sequence of room types for a floor before any room
@@ -86,28 +85,28 @@ class Room {
         this.roomType = floorMap.typeAt(roomIndex);
         this.palette = this._getPalette(floor);
 
-        // Playable bounds (inside walls)
+        // Playable bounds (inside walls) — HUD is outside the canvas now
         this.bounds = {
             x: WALL,
-            y: WALL + HUD_H,
+            y: WALL,
             width:  canvas.width  - WALL * 2,
-            height: canvas.height - WALL * 2 - HUD_H,
+            height: canvas.height - WALL * 2,
         };
 
-        // Is this the very first room of the floor? (no entry door needed)
         this.isFirstRoom = roomIndex === 1;
-        // Is this the very last room of the floor? (no exit door)
         this.isLastRoom  = roomIndex === floorMap.totalRooms;
 
         this.enemies = [];
         this.cleared  = false;
         this.clearFlashTimer = 0;
 
-        // Door trigger zones — player walks into these to advance
-        // exitDoor: right-wall door (advances to next room when cleared)
-        // entryDoor: left-wall door (cosmetic, shows where player came from)
-        this.exitDoor  = this._makeDoor('right');
-        this.entryDoor = this._makeDoor('left');
+        // All 4 door zones (player walks into one to advance)
+        this.doors = {
+            right:  this._makeDoor('right'),
+            left:   this._makeDoor('left'),
+            top:    this._makeDoor('top'),
+            bottom: this._makeDoor('bottom'),
+        };
 
         this._spawnEnemies();
     }
@@ -116,20 +115,24 @@ class Room {
 
     _makeDoor(side) {
         const { x, y, width, height } = this.bounds;
+        const midX = x + width  / 2 - DOOR_W / 2;
         const midY = y + height / 2 - DOOR_W / 2;
-        if (side === 'right') {
-            return { x: x + width, y: midY, width: DOOR_H, height: DOOR_W, side };
+        switch (side) {
+            case 'right':  return { x: x + width, y: midY,       width: DOOR_H, height: DOOR_W, side };
+            case 'left':   return { x: x - DOOR_H, y: midY,      width: DOOR_H, height: DOOR_W, side };
+            case 'top':    return { x: midX, y: y - DOOR_H,      width: DOOR_W, height: DOOR_H, side };
+            case 'bottom': return { x: midX, y: y + height,      width: DOOR_W, height: DOOR_H, side };
         }
-        return { x: x - DOOR_H, y: midY, width: DOOR_H, height: DOOR_W, side };
     }
 
-    // Returns true if player hitbox overlaps the exit door trigger
-    playerAtExit(player) {
-        if (!this.cleared) return false;
-        return this._rectsOverlap(
-            { x: player.x, y: player.y, width: player.width, height: player.height },
-            this.exitDoor
-        );
+    // Returns exit direction string if player is in an open door zone, else null
+    getExitDirection(player) {
+        if (!this.cleared) return null;
+        const pb = { x: player.x, y: player.y, width: player.width, height: player.height };
+        for (const [dir, zone] of Object.entries(this.doors)) {
+            if (this._rectsOverlap(pb, zone)) return dir;
+        }
+        return null;
     }
 
     // ── Spawning ─────────────────────────────────────────────────────────────
@@ -174,13 +177,13 @@ class Room {
             }
         }
 
-        // Constrain player to playable area while doors are closed
-        // When cleared, allow player into the door openings
-        const minX = this.cleared ? this.bounds.x - DOOR_H : this.bounds.x;
-        const maxX = this.cleared ? this.bounds.x + this.bounds.width + DOOR_H - player.width
-                                  : this.bounds.x + this.bounds.width - player.width;
-        const minY = this.bounds.y;
-        const maxY = this.bounds.y + this.bounds.height - player.height;
+        // While doors are locked, keep player fully inside bounds.
+        // Once cleared, allow them to walk into any of the 4 door openings.
+        const extra = this.cleared ? DOOR_H : 0;
+        const minX = this.bounds.x - extra;
+        const maxX = this.bounds.x + this.bounds.width  + extra - player.width;
+        const minY = this.bounds.y - extra;
+        const maxY = this.bounds.y + this.bounds.height + extra - player.height;
 
         player.x = Math.max(minX, Math.min(maxX, player.x));
         player.y = Math.max(minY, Math.min(maxY, player.y));
@@ -261,28 +264,19 @@ class Room {
             ctx.beginPath(); ctx.moveTo(x, ty); ctx.lineTo(x + width, ty); ctx.stroke();
         }
 
-        // ── Walls ───────────────────────────────────────────────────────────
-        // We draw 4 solid wall slabs, then cut out door openings by
-        // drawing the floor colour back over the door gap.
-
+        // ── Walls (solid slabs covering all 4 sides) ─────────────────────────
         ctx.fillStyle = wallColor;
-        // top wall
-        ctx.fillRect(0, HUD_H, cx, WALL);
-        // bottom wall
-        ctx.fillRect(0, y + height, cx, WALL);
-        // left wall
-        ctx.fillRect(0, HUD_H, WALL, cy - HUD_H);
-        // right wall
-        ctx.fillRect(x + width, HUD_H, WALL, cy - HUD_H);
+        ctx.fillRect(0,         0,         cx,   WALL);           // top
+        ctx.fillRect(0,         y + height, cx,   WALL);           // bottom
+        ctx.fillRect(0,         0,          WALL, cy);             // left
+        ctx.fillRect(x + width, 0,          WALL, cy);             // right
 
         // ── Door openings ────────────────────────────────────────────────────
-        // Exit door (right wall) — always drawn
-        this._drawDoor(ctx, 'right', this.cleared, floorColor, accent, wallColor);
-
-        // Entry door (left wall) — only when not the first room
-        if (!this.isFirstRoom) {
-            this._drawDoor(ctx, 'left', true, floorColor, accent, wallColor);
-        }
+        // All 4 doors open when cleared; entry doors are shown even if first room
+        this._drawDoor(ctx, 'right',  this.cleared,   floorColor, accent, wallColor);
+        this._drawDoor(ctx, 'left',   this.cleared || !this.isFirstRoom, floorColor, accent, wallColor);
+        this._drawDoor(ctx, 'top',    this.cleared,   floorColor, accent, wallColor);
+        this._drawDoor(ctx, 'bottom', this.cleared,   floorColor, accent, wallColor);
 
         // ── Border accent line ───────────────────────────────────────────────
         ctx.strokeStyle = accent + '66';
@@ -305,51 +299,55 @@ class Room {
 
     _drawDoor(ctx, side, open, floorColor, accent, wallColor) {
         const { x, y, width, height } = this.bounds;
+        const midX = x + width  / 2;
         const midY = y + height / 2;
-        const halfW = DOOR_W / 2;
+        const half = DOOR_W / 2;
 
-        // Door gap coords in the wall
-        let gapX, gapY, gapW, gapH;
-        if (side === 'right') {
-            gapX = x + width;  gapY = midY - halfW; gapW = WALL; gapH = DOOR_W;
-        } else {
-            gapX = x - WALL;   gapY = midY - halfW; gapW = WALL; gapH = DOOR_W;
+        let gapX, gapY, gapW, gapH, arrowGlyph, arrowX, arrowY;
+        switch (side) {
+            case 'right':
+                gapX = x + width; gapY = midY - half; gapW = WALL; gapH = DOOR_W;
+                arrowGlyph = '▶'; arrowX = gapX + WALL / 2; arrowY = midY; break;
+            case 'left':
+                gapX = x - WALL;  gapY = midY - half; gapW = WALL; gapH = DOOR_W;
+                arrowGlyph = '◀'; arrowX = gapX + WALL / 2; arrowY = midY; break;
+            case 'top':
+                gapX = midX - half; gapY = y - WALL; gapW = DOOR_W; gapH = WALL;
+                arrowGlyph = '▲'; arrowX = midX; arrowY = gapY + WALL / 2; break;
+            case 'bottom':
+                gapX = midX - half; gapY = y + height; gapW = DOOR_W; gapH = WALL;
+                arrowGlyph = '▼'; arrowX = midX; arrowY = gapY + WALL / 2; break;
         }
 
         if (open) {
-            // Carve out the wall to show the opening
             ctx.fillStyle = floorColor;
             ctx.fillRect(gapX, gapY, gapW, gapH);
 
-            // Draw arrow/chevron hint in opening
             ctx.fillStyle = accent + 'bb';
-            ctx.font = '22px serif';
+            ctx.font = '20px serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            const arrowX = gapX + gapW / 2;
-            ctx.fillText(side === 'right' ? '▶' : '◀', arrowX, midY);
+            ctx.fillText(arrowGlyph, arrowX, arrowY);
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';
 
-            // Door frame
-            ctx.strokeStyle = accent + '99';
+            ctx.strokeStyle = accent + '88';
             ctx.lineWidth = 2;
             ctx.strokeRect(gapX, gapY, gapW, gapH);
         } else {
-            // Closed door — darker fill + lock icon
-            ctx.fillStyle = wallColor + 'cc';
+            ctx.fillStyle = wallColor;
             ctx.fillRect(gapX, gapY, gapW, gapH);
 
-            ctx.fillStyle = '#ff335599';
+            ctx.fillStyle = '#ff335577';
             ctx.font = '14px serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('🔒', gapX + gapW / 2, midY);
+            ctx.fillText('🔒', arrowX, arrowY);
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';
 
-            ctx.strokeStyle = '#ff335555';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#ff335544';
+            ctx.lineWidth = 1;
             ctx.strokeRect(gapX, gapY, gapW, gapH);
         }
     }
@@ -417,19 +415,19 @@ class Room {
         const dotR = 4;
         const spacing = 14;
         const startX = this.canvas.width / 2 - ((total - 1) * spacing) / 2;
-        const dotY = HUD_H + WALL / 2;
+        const dotY = WALL / 2; // center of top wall (HUD is now outside canvas)
 
         for (let i = 0; i < total; i++) {
             const roomNum = i + 1;
             const isCurrent = roomNum === this.roomIndex;
 
-            let color;
             const type = this.floorMap.typeAt(roomNum);
-            if (type === 'boss')   color = '#ff4444';
+            let color;
+            if (type === 'boss')                              color = '#ff4444';
             else if (type === 'shop' || type === 'locked_shop') color = '#44ffcc';
-            else if (type === 'secret') color = '#ffcc44';
-            else if (type === 'marked_door') color = '#cc88ff';
-            else                   color = '#4488cc';
+            else if (type === 'secret')                       color = '#ffcc44';
+            else if (type === 'marked_door')                  color = '#cc88ff';
+            else                                              color = '#4488cc';
 
             ctx.beginPath();
             ctx.arc(startX + i * spacing, dotY, isCurrent ? dotR + 2 : dotR, 0, Math.PI * 2);

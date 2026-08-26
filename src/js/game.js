@@ -4,24 +4,20 @@ class Game {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.canvas.width = window.innerWidth - 10;
-        this.canvas.height = window.innerHeight - 10;
+        this._resizeCanvas();
 
         this.player = null;
         this.currentFloor = 1;
         this.currentRoom = 1;
         this.currentRoomObject = null;
-        this.floorMap = null; // FloorMap for current floor
+        this.floorMap = null;
 
-        this.gameState = 'menu'; // menu, playing, paused, gameover
+        this.gameState = 'menu';
         this.isPaused = false;
         this.startTime = 0;
         this.elapsedTime = 0;
-
-        // Prevent rapidly triggering the same room transition
         this.transitioning = false;
 
-        // Stats tracking
         this.stats = {
             floorsReached: 1,
             roomsCleared: 0,
@@ -33,15 +29,19 @@ class Game {
         this.setupEventListeners();
     }
 
+    _resizeCanvas() {
+        const wrap = document.getElementById('canvas-wrap');
+        this.canvas.width  = wrap ? wrap.clientWidth  : window.innerWidth;
+        this.canvas.height = wrap ? wrap.clientHeight : window.innerHeight - 44;
+    }
+
     setupEventListeners() {
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') this.togglePause();
         });
 
         window.addEventListener('resize', () => {
-            this.canvas.width = window.innerWidth - 10;
-            this.canvas.height = window.innerHeight - 10;
-            // Regenerate current room with new canvas size
+            this._resizeCanvas();
             if (this.currentRoomObject && this.floorMap) {
                 this.generateRoom();
             }
@@ -75,7 +75,7 @@ class Game {
         this.generateRoom();
     }
 
-    generateRoom() {
+    generateRoom(entryDir = 'left') {
         this.currentRoomObject = new Room(
             this.currentFloor,
             this.currentRoom,
@@ -83,25 +83,41 @@ class Game {
             this.canvas
         );
 
-        // Place player at left-center of the room (entry side), not center
+        // Spawn player near the wall they entered from
         const b = this.currentRoomObject.bounds;
-        this.player.x = b.x + 60;
-        this.player.y = b.y + b.height / 2 - this.player.height / 2;
+        const midY = b.y + b.height / 2 - this.player.height / 2;
+        const midX = b.x + b.width  / 2 - this.player.width  / 2;
+        const INSET = 70;
+        if (entryDir === 'left') {
+            this.player.x = b.x + INSET;
+            this.player.y = midY;
+        } else if (entryDir === 'right') {
+            this.player.x = b.x + b.width - INSET - this.player.width;
+            this.player.y = midY;
+        } else if (entryDir === 'top') {
+            this.player.x = midX;
+            this.player.y = b.y + INSET;
+        } else { // bottom
+            this.player.x = midX;
+            this.player.y = b.y + b.height - INSET - this.player.height;
+        }
 
         this.transitioning = false;
-
-        console.log(`Floor ${this.currentFloor} | Room ${this.currentRoom}/${this.floorMap.totalRooms} | Type: ${this.floorMap.typeAt(this.currentRoom)}`);
+        console.log(`Floor ${this.currentFloor} | Room ${this.currentRoom}/${this.floorMap.totalRooms} | Type: ${this.floorMap.typeAt(this.currentRoom)} | Entry: ${entryDir}`);
     }
 
-    nextRoom() {
+    nextRoom(exitDir = 'right') {
         if (this.transitioning) return;
         this.transitioning = true;
-
         this.stats.roomsCleared++;
+
+        // Player enters next room from the mirrored side
+        const opposites = { right: 'right', left: 'left', top: 'bottom', bottom: 'top' };
+        const entryDir = opposites[exitDir] ?? 'left';
 
         if (this.currentRoom < this.floorMap.totalRooms) {
             this.currentRoom++;
-            this.generateRoom();
+            this.generateRoom(entryDir);
         } else {
             this.nextFloor();
         }
@@ -113,7 +129,7 @@ class Game {
             this.currentRoom = 1;
             this.stats.floorsReached = this.currentFloor;
             this.floorMap = new FloorMap(this.currentFloor);
-            this.generateRoom();
+            this.generateRoom('left');
         } else {
             this.victory();
         }
@@ -136,9 +152,10 @@ class Game {
                 return;
             }
 
-            // Transition: player walks into exit door opening
-            if (!this.transitioning && this.currentRoomObject.playerAtExit(this.player)) {
-                this.nextRoom();
+            // Transition: player walks into any open exit door
+            if (!this.transitioning) {
+                const exitDir = this.currentRoomObject.getExitDirection(this.player);
+                if (exitDir) this.nextRoom(exitDir);
             }
         }
 

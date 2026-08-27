@@ -640,10 +640,25 @@
       const target = clamp(preferredCount[this.type] || 1, 1, 3);
       const features = [];
 
+      const angleSteps = 12;
       for (let i = 0; i < target; i += 1) {
         const index = Math.abs((this.floor * 41 + this.roomNumber * 13 + i * 29) % weightedTypes.length);
         const barrierType = weightedTypes[index];
-        const feature = this.createEnvironmentalFeature(barrierType, i, target);
+        let feature = this.createEnvironmentalFeature(barrierType, i, target);
+        if (this.walls && this.rectCollidesWithWalls(feature)) {
+          let placed = false;
+          for (let step = 1; step < angleSteps; step += 1) {
+            const adjustedSlot = i + step / angleSteps;
+            const rect = this.getFeatureRect(adjustedSlot, target, 110, 84);
+            const candidate = Object.assign({}, feature, rect);
+            if (!this.rectCollidesWithWalls(candidate)) {
+              feature = candidate;
+              placed = true;
+              break;
+            }
+          }
+          if (!placed) continue;
+        }
         features.push(feature);
       }
 
